@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: dentalcare_db
+    restart: always
+    environment:
+      POSTGRES_USER: dentalcare_user
+      POSTGRES_PASSWORD: dentalcare_password
+      POSTGRES_DB: dentalcare_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  test_db:
+    image: postgres:16-alpine
+    container_name: dentalcare_test_db
+    restart: always
+    environment:
+      POSTGRES_USER: dentalcare_test_user
+      POSTGRES_PASSWORD: dentalcare_test_password
+      POSTGRES_DB: dentalcare_test_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dentalcare_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://dentalcare_user:dentalcare_password@db:5432/dentalcare_db?schema=public
+      - TEST_DATABASE_URL=postgresql://dentalcare_test_user:dentalcare_test_password@test_db:5432/dentalcare_test_db?schema=public
+      - JWT_SECRET=super_secret_for_development_only
+      - JWT_REFRESH_SECRET=super_secret_refresh_for_development_only
+      - PORT=3000
+    depends_on:
+      - db
+      - test_db
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dentalcare_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3000/api/v1
+
+volumes:
+  postgres_data:
+  postgres_test_data:

@@ -1,0 +1,413 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------
+// 1. Core de Tenancy y Estructura Organizacional
+// ----------------------------------------------------------------------
+
+enum PlanType {
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+enum Role {
+  SUPER_ADMIN
+  OWNER
+  DOCTOR
+  RECEPTIONIST
+}
+
+enum Status {
+  PENDING_PAYMENT
+  ACTIVE
+  SUSPENDED
+}
+
+model Organization {
+  id             String    @id @default(uuid())
+  name           String
+  slug           String    @unique
+  plan           PlanType  @default(BASIC)
+  is_active      Boolean   @default(true)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  logo_url       String?   // Logo institucional por defecto
+
+  clinics        Clinic[]
+  users          User[]
+  patients       Patient[]
+  cash_registers CashRegister[]
+
+  @@map("organizations")
+}
+
+model Clinic {
+  id              String       @id @default(uuid())
+  organization_id String
+  name            String
+  address         String?
+  phone           String?
+  status          Status       @default(PENDING_PAYMENT)
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  logo_url        String?      // Logo específico de la sucursal
+
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  offices         Office[]
+  user_assignments UserClinicAssignment[]
+  appointments    Appointment[]
+  doctor_schedules DoctorSchedule[]
+  cash_registers  CashRegister[]
+
+  @@map("clinics")
+}
+
+model Office {
+  id          String   @id @default(uuid())
+  clinic_id   String
+  name        String
+  floor       String?
+  status      Status   @default(PENDING_PAYMENT)
+
+  clinic      Clinic   @relation(fields: [clinic_id], references: [id])
+  appointments Appointment[]
+  user_assignments UserOfficeAssignment[]
+
+  @@map("offices")
+}
+
+model User {
+  id              String    @id @default(uuid())
+  organization_id String?   // Null para SUPER_ADMIN
+  supervisor_id   String?
+  email           String    @unique
+  password_hash   String
+  first_name      String
+  last_name       String
+  phone           String?
+  role            Role
+  license_number  String?   // Cédula Profesional (Mandatorio para firma)
+  specialty       String?   // Especialidad
+  signature_stamp_url String? // Imagen de firma autógrafa
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  organization    Organization? @relation(fields: [organization_id], references: [id])
+  supervisor      User?         @relation("UserSupervisor", fields: [supervisor_id], references: [id])
+  subordinates    User[]        @relation("UserSupervisor")
+  clinic_assignments UserClinicAssignment[]
+  office_assignments UserOfficeAssignment[]
+  
+  appointments_created Appointment[] @relation("AppointmentCreator")
+  appointments_as_doctor Appointment[] @relation("AppointmentDoctor")
+  
+  services_offered  Service[]
+  
+  medical_records   MedicalRecord[] @relation("DoctorTreating")
+  doctor_schedules  DoctorSchedule[]
+  cash_registered   CashRegister[]
+  audit_logs        AuditLog[]
+  prescriptions     Prescription[]
+
+  @@map("users")
+}
+
+model UserClinicAssignment {
+  id        String @id @default(uuid())
+  user_id   String
+  clinic_id String
+
+  user      User   @relation(fields: [user_id], references: [id])
+  clinic    Clinic @relation(fields: [clinic_id], references: [id])
+
+  @@unique([user_id, clinic_id])
+  @@map("user_clinic_assignments")
+}
+
+model UserOfficeAssignment {
+  id        String @id @default(uuid())
+  user_id   String
+  office_id String
+
+  user      User   @relation(fields: [user_id], references: [id])
+  office    Office @relation(fields: [office_id], references: [id])
+
+  @@unique([user_id, office_id])
+  @@map("user_office_assignments")
+}
+
+// ----------------------------------------------------------------------
+// 2. Pacientes, Citas y Servicios
+// ----------------------------------------------------------------------
+
+enum Gender {
+  M
+  F
+  OTHER
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Patient {
+  id                String    @id @default(uuid())
+  organization_id   String
+  first_name        String
+  last_name         String
+  email             String?
+  phone             String    // Usado para WhatsApp
+  date_of_birth     DateTime?
+  gender            Gender?
+  address           String?
+  emergency_contact String?
+  notes             String?   // Notas administrativas, no clínicas
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  appointments      Appointment[]
+  medical_records   MedicalRecord[]
+  prescriptions     Prescription[]
+
+  @@map("patients")
+}
+
+model Service {
+  id              String   @id @default(uuid())
+  doctor_id       String
+  name            String
+  description     String?
+  price           Decimal  @db.Decimal(10, 2)
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+
+  doctor          User     @relation(fields: [doctor_id], references: [id])
+  appointment_services AppointmentService[]
+
+  @@map("services")
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  organization_id String
+  clinic_id       String
+  office_id       String
+  doctor_id       String
+  patient_id      String
+  created_by      String
+  
+  start_time      DateTime
+  end_time        DateTime
+  status          AppointmentStatus @default(PENDING)
+  reason          String?
+  cancel_reason   String?
+  
+  total_amount    Decimal           @db.Decimal(10, 2) @default(0)
+  is_paid         Boolean           @default(false)
+  
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+
+  clinic          Clinic            @relation(fields: [clinic_id], references: [id])
+  office          Office            @relation(fields: [office_id], references: [id])
+  doctor          User              @relation("AppointmentDoctor", fields: [doctor_id], references: [id])
+  patient         Patient           @relation(fields: [patient_id], references: [id])
+  creator         User              @relation("AppointmentCreator", fields: [created_by], references: [id])
+  
+  services        AppointmentService[]
+  medical_notes   MedicalNote[]
+  prescriptions   Prescription[]
+  cash_registers  CashRegister[]
+
+  @@map("appointments")
+}
+
+model AppointmentService {
+  id              String      @id @default(uuid())
+  appointment_id  String
+  service_id      String?     // Opcional por si agregamos items manuales no en catálogo
+  name            String      // Guardamos nombre del servicio (snapshot por si cambia)
+  price           Decimal     @db.Decimal(10, 2) // Precio cobrado (snapshot)
+
+  appointment     Appointment @relation(fields: [appointment_id], references: [id])
+  service         Service?    @relation(fields: [service_id], references: [id])
+
+  @@map("appointment_services")
+}
+
+// ----------------------------------------------------------------------
+// 3. Expediente Médico
+// ----------------------------------------------------------------------
+
+enum NoteType {
+  CONSULTATION
+  FOLLOW_UP
+  PROCEDURE
+  PRESCRIPTION
+}
+
+model MedicalRecord {
+  id                String       @id @default(uuid())
+  patient_id        String
+  doctor_id         String       // Médico tratante. Privacidad: solo él consulta este exp.
+  organization_id   String?
+  
+  diagnosis               String?
+  treatment_plan          String?
+  
+  // Historia Clínica Estructurada
+  family_history          String?   @db.Text
+  pathological_history    String?   @db.Text
+  non_pathological_history String?  @db.Text
+  allergies               String?   @db.Text
+  surgeries               String?   @db.Text
+  current_medications     String?   @db.Text
+  
+  // Específicos de Odontología
+  dental_history          String?   @db.Text
+  brushing_frequency      String?
+  use_floss               Boolean?  @default(false)
+  
+  clinical_notes          Json?        // Notas adicionales flexibles
+  medications             Json?        // Snapshot de recetas (opcional)
+  
+  created_at              DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  patient           Patient      @relation(fields: [patient_id], references: [id])
+  doctor            User         @relation("DoctorTreating", fields: [doctor_id], references: [id])
+  
+  notes             MedicalNote[]
+  odontograms       Odontogram[]
+
+  @@unique([patient_id, doctor_id])
+  @@map("medical_records")
+}
+
+model MedicalNote {
+  id                String        @id @default(uuid())
+  medical_record_id String
+  appointment_id    String?
+  content           String
+  note_type         NoteType      @default(CONSULTATION)
+  attachments       Json?         // Rutas a imagenes/archivos
+  is_signed         Boolean       @default(false)
+  signed_at         DateTime?
+  signature_hash    String?       // SHA-256
+  created_at        DateTime      @default(now())
+
+  medical_record    MedicalRecord @relation(fields: [medical_record_id], references: [id])
+  appointment       Appointment?  @relation(fields: [appointment_id], references: [id])
+
+  @@map("medical_notes")
+}
+
+model Odontogram {
+  id                String        @id @default(uuid())
+  medical_record_id String
+  tooth_data        Json          // { toothNumber: { status: "CARIES", surfaces: ["M", "O"], notes: "..." } }
+  version           Int           @default(1)
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
+
+  medical_record    MedicalRecord @relation(fields: [medical_record_id], references: [id])
+
+  @@map("odontograms")
+}
+
+// ----------------------------------------------------------------------
+// 4. Operación y Horarios
+// ----------------------------------------------------------------------
+
+model DoctorSchedule {
+  id          String   @id @default(uuid())
+  doctor_id   String
+  clinic_id   String
+  day_of_week Int      // 0 = Sunday, ..., 6 = Saturday
+  start_time  String   // e.g., "09:00"
+  end_time    String   // e.g., "17:00"
+  is_active   Boolean  @default(true)
+
+  doctor      User     @relation(fields: [doctor_id], references: [id])
+  clinic      Clinic   @relation(fields: [clinic_id], references: [id])
+
+  @@map("doctor_schedules")
+}
+
+enum CashType {
+  INCOME
+  EXPENSE
+}
+
+enum CashCategory {
+  APPOINTMENT_PAYMENT
+  SUPPLIES
+  RENT
+  SALARY
+  OTHER
+}
+
+model CashRegister {
+  id              String        @id @default(uuid())
+  organization_id String
+  clinic_id       String
+  appointment_id  String?
+  type            CashType
+  amount          Decimal       @db.Decimal(10, 2)
+  description     String
+  category        CashCategory  @default(OTHER)
+  registered_by   String
+  created_at      DateTime      @default(now())
+
+  organization    Organization  @relation(fields: [organization_id], references: [id])
+  clinic          Clinic        @relation(fields: [clinic_id], references: [id])
+  appointment     Appointment?  @relation(fields: [appointment_id], references: [id])
+  user            User          @relation(fields: [registered_by], references: [id])
+
+  @@map("cash_registers")
+}
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  user_id         String?
+  action          String   // CREATE, SIGN, UPDATE, DELETE, VIEW
+  target_model    String?  // MEDICAL_RECORD, PATIENT, etc.
+  target_id       String?
+  metadata        Json?    // { ip: "...", old_value: "...", new_value: "..." }
+  created_at      DateTime @default(now())
+
+  user            User?    @relation(fields: [user_id], references: [id])
+
+  @@map("audit_logs")
+}
+
+model Prescription {
+  id              String   @id @default(uuid())
+  patient_id      String
+  doctor_id       String
+  appointment_id  String?
+  medications     Json     // [{ name, dose, frequency, duration }]
+  instructions    String?
+  created_at      DateTime @default(now())
+
+  patient         Patient  @relation(fields: [patient_id], references: [id])
+  doctor          User     @relation(fields: [doctor_id], references: [id])
+  appointment     Appointment? @relation(fields: [appointment_id], references: [id])
+
+  @@map("prescriptions")
+}
