@@ -45,8 +45,31 @@ model Organization {
   users          User[]
   patients       Patient[]
   cash_registers CashRegister[]
+  whatsapp_config OrganizationWhatsAppConfig?
 
   @@map("organizations")
+}
+
+model OrganizationWhatsAppConfig {
+  id                   String       @id @default(uuid())
+  organization_id      String       @unique
+  enabled              Boolean      @default(false)
+  dry_run              Boolean      @default(true)
+  access_token         String?
+  phone_number_id      String?
+  api_version          String       @default("v21.0")
+  template_name        String       @default("appointment_confirmation_24h")
+  template_lang        String       @default("es_MX")
+  webhook_verify_token String?
+  reminders_enabled    Boolean      @default(false)
+  job_interval_ms      Int          @default(300000)
+  window_minutes       Int          @default(15)
+  created_at           DateTime     @default(now())
+  updated_at           DateTime     @updatedAt
+
+  organization         Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("organization_whatsapp_configs")
 }
 
 model Clinic {
@@ -164,6 +187,12 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 model Patient {
   id                String    @id @default(uuid())
   organization_id   String
@@ -233,8 +262,28 @@ model Appointment {
   medical_notes   MedicalNote[]
   prescriptions   Prescription[]
   cash_registers  CashRegister[]
+  reminders       AppointmentReminder[]
 
   @@map("appointments")
+}
+
+model AppointmentReminder {
+  id                  String         @id @default(uuid())
+  appointment_id      String
+  reminder_type       String         @default("WHATSAPP_CONFIRM_24H")
+  scheduled_for       DateTime
+  sent_at             DateTime?
+  status              ReminderStatus @default(PENDING)
+  retry_count         Int            @default(0)
+  last_error          String?
+  provider_message_id String?
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+
+  appointment         Appointment    @relation(fields: [appointment_id], references: [id])
+
+  @@unique([appointment_id, reminder_type])
+  @@map("appointment_reminders")
 }
 
 model AppointmentService {

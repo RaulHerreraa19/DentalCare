@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../lib/axios';
-import { Plus, Building, Lock, ChevronDown, ChevronUp, MapPin, Edit3, Image as ImageIcon, Phone, Save, X } from 'lucide-react';
+import { Plus, Building, Lock, ChevronDown, ChevronUp, MapPin, Edit3, Image as ImageIcon, Phone, Save, X, Building2 } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function OwnerClinics() {
   const [clinics, setClinics] = useState([]);
@@ -31,9 +32,21 @@ export default function OwnerClinics() {
       setShowForm(false);
       setName('');
       setAddress('');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Sucursal Registrada',
+        text: 'La nueva unidad de negocio ha sido dada de alta exitosamente.',
+        confirmButtonColor: '#0f172a',
+        timer: 1500
+      });
       fetchClinics();
     } catch (error) {
-      alert('Error al crear clínica');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Red',
+        text: 'No se pudo completar el registro de la sucursal.',
+        confirmButtonColor: '#0f172a'
+      });
     }
   };
 
@@ -144,9 +157,21 @@ function ClinicRow({ clinic, onUpdate }) {
     try {
       await api.patch(`/clinics/${clinic.id}`, editData);
       setIsEditing(false);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Configuración Actualizada',
+        text: 'Los datos de la sucursal han sido sincronizados correctamente.',
+        confirmButtonColor: '#0f172a',
+        timer: 1500
+      });
       onUpdate();
     } catch (error) {
-      alert('Error al actualizar clínica');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Actualización',
+        text: 'No se pudieron guardar los cambios en la sucursal.',
+        confirmButtonColor: '#0f172a'
+      });
     }
   };
 
@@ -157,9 +182,21 @@ function ClinicRow({ clinic, onUpdate }) {
       setOfficeName('');
       setOfficeFloor('');
       setShowAddOffice(false);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Área Registrada',
+        text: 'El nuevo consultorio ha sido añadido a la distribución de la sucursal.',
+        confirmButtonColor: '#0f172a',
+        timer: 1500
+      });
       fetchOffices();
     } catch (err) {
-      alert('Error al crear consultorio');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error Operativo',
+        text: 'No se pudo registrar el consultorio en este momento.',
+        confirmButtonColor: '#0f172a'
+      });
     }
   };
 

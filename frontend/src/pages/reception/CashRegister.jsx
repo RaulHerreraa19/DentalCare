@@ -14,6 +14,7 @@ import {
   FileText
 } from 'lucide-react';
 import api from '../../lib/axios';
+import Swal from 'sweetalert2';
 
 export default function CashRegister() {
   const [history, setHistory] = useState([]);
@@ -61,12 +62,21 @@ export default function CashRegister() {
   const handleCreateMovement = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/billing/movement', newMovement);
-      setShowModal(false);
-      setNewMovement({ clinic_id: '', type: 'INCOME', amount: '', description: '', category: 'OTHER' });
+      await Swal.fire({
+        icon: 'success',
+        title: 'Movimiento Registrado',
+        text: 'El asiento contable ha sido guardado exitosamente.',
+        confirmButtonColor: '#0f172a',
+        timer: 2000
+      });
       fetchData();
     } catch (error) {
-      alert('Error registrando movimiento');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Caja',
+        text: error.response?.data?.message || 'No se pudo registrar el movimiento financiero.',
+        confirmButtonColor: '#0f172a'
+      });
     }
   };
 

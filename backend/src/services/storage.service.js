@@ -1,5 +1,5 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -26,7 +26,7 @@ class StorageService {
    */
   async uploadImage(buffer, originalName) {
     const extension = originalName.split('.').pop();
-    const fileName = `${uuidv4()}.${extension}`;
+    const fileName = `${crypto.randomUUID()}.${extension}`;
 
     if (this.useAzure) {
       const blockBlobClient = this.containerClient.getBlockBlobClient(fileName);

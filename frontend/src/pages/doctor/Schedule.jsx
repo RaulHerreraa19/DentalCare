@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, ChevronRight, CheckCircle, User, FileText, LayoutDashboard, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/axios';
+import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
 
 export default function DoctorSchedule() {
@@ -168,7 +169,12 @@ function AttendModal({ appointment, onClose, onSuccess }) {
       });
       onSuccess();
     } catch (error) {
-      alert(error.response?.data?.message || 'Error al reportar la consulta');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Sincronización',
+        text: error.response?.data?.message || 'No se pudo reportar el cierre de la consulta.',
+        confirmButtonColor: '#0f172a'
+      });
     } finally {
       setLoading(false);
     }

@@ -6,19 +6,22 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Cleaning database...');
   
-  // Delete in order to avoid foreign key constraints
-  await prisma.doctorSchedule.deleteMany();
-  await prisma.appointmentService.deleteMany();
+  // Delete in order to avoid foreign key constraints (Children before Parents)
+  await prisma.auditLog.deleteMany();
+  await prisma.prescription.deleteMany();
   await prisma.medicalNote.deleteMany();
   await prisma.odontogram.deleteMany();
   await prisma.medicalRecord.deleteMany();
-  await prisma.appointment.deleteMany();
+  await prisma.doctorSchedule.deleteMany();
+  await prisma.appointmentService.deleteMany();
   await prisma.cashRegister.deleteMany();
+  await prisma.appointment.deleteMany();
   await prisma.service.deleteMany();
-  await prisma.patient.deleteMany();
+  await prisma.userOfficeAssignment.deleteMany();
   await prisma.userClinicAssignment.deleteMany();
   await prisma.user.deleteMany();
   await prisma.office.deleteMany();
+  await prisma.patient.deleteMany();
   await prisma.clinic.deleteMany();
   await prisma.organization.deleteMany();
 

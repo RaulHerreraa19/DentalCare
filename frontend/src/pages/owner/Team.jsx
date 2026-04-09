@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../lib/axios';
 import { UserPlus, Star, UserCheck, Shield, Edit2, X, Check } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function OwnerTeam() {
   const [employees, setEmployees] = useState([]);
@@ -96,8 +97,24 @@ export default function OwnerTeam() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.clinic_id) return alert('Seleccione una sucursal.');
-    if (formData.office_ids.length === 0) return alert('Seleccione al menos un consultorio.');
+    if (!formData.clinic_id) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Selección Requerida',
+        text: 'Por favor seleccione una sucursal para la asignación.',
+        confirmButtonColor: '#0f172a'
+      });
+      return;
+    }
+    if (formData.office_ids.length === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Selección Requerida',
+        text: 'Por favor seleccione al menos un consultorio o área de trabajo.',
+        confirmButtonColor: '#0f172a'
+      });
+      return;
+    }
 
     try {
       if (editingUserId) {
@@ -111,9 +128,23 @@ export default function OwnerTeam() {
       
       setShowForm(false);
       setEditingUserId(null);
+      await Swal.fire({
+        icon: 'success',
+        title: editingUserId ? 'Información Actualizada' : 'Invitación Enviada',
+        text: editingUserId 
+          ? 'Los cambios en el perfil del colaborador han sido guardados.' 
+          : 'Se ha registrado el acceso y enviado las credenciales al correo especificado.',
+        confirmButtonColor: '#0f172a',
+        timer: 1500
+      });
       fetchData();
     } catch (error) {
-      alert(error.response?.data?.message || 'Error en la solicitud');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Gestión',
+        text: error.response?.data?.message || 'No se pudo completar la operación en el sistema.',
+        confirmButtonColor: '#0f172a'
+      });
     }
   };
 

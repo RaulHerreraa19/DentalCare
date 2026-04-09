@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../lib/axios';
 import { Building2, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function SuperAdminDashboard() {
   const [data, setData] = useState({ pending_clinics: [], organizations: [] });
@@ -22,12 +23,36 @@ export default function SuperAdminDashboard() {
   }, []);
 
   const handleApproveClinic = async (id) => {
-    if (!window.confirm('¿Confirmar que has recibido el pago y habilitar este consultorio?')) return;
-    try {
-      await api.patch(`/superadmin/approve-clinic/${id}`);
-      fetchDashboard();
-    } catch (error) {
-      alert('Error al aprobar');
+    const result = await Swal.fire({
+      title: '¿Confirmar Activación?',
+      text: "Habilitarás este consultorio para operar en la plataforma. ¿Confirmas que has recibido el pago correspondente?",
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#0f172a',
+      cancelButtonColor: '#cbd5e1',
+      confirmButtonText: 'Sí, Activar Sucursal',
+      cancelButtonText: 'Pendiente'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.patch(`/superadmin/approve-clinic/${id}`);
+        Swal.fire({
+          icon: 'success',
+          title: 'Sucursal Activada',
+          text: 'El consultorio ahora puede iniciar operaciones.',
+          confirmButtonColor: '#0f172a',
+          timer: 1500
+        });
+        fetchDashboard();
+      } catch (error) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error Administrativo',
+          text: 'No se pudo activar la sucursal.',
+          confirmButtonColor: '#0f172a'
+        });
+      }
     }
   };
 

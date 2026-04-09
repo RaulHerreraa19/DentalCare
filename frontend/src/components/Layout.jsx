@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, LogOut, Building, Users, CalendarDays, UserSquare2, DollarSign, Activity, FileText } from 'lucide-react';
+import { LayoutDashboard, LogOut, Building, Users, CalendarDays, UserSquare2, DollarSign, Activity, FileText, MessageCircle } from 'lucide-react';
 
 export const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user } = useAuth();
@@ -28,6 +28,7 @@ export const Layout = () => {
       { name: 'Sucursales', path: '/owner/clinics', icon: Building },
       { name: 'Equipo Directivo', path: '/owner/team', icon: Users },
       { name: 'Gestión de Caja', path: '/billing/cash', icon: DollarSign },
+      { name: 'WhatsApp Meta', path: '/owner/whatsapp', icon: MessageCircle },
       { name: 'Utilerías de Identidad', path: '/doctor/profile', icon: UserSquare2 },
     ],
     DOCTOR: [

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../lib/axios';
+import Swal from 'sweetalert2';
 import {
   User,
   FileText,
@@ -121,14 +122,31 @@ export default function MedicalRecordEditor() {
           total_amount: parseFloat(sessionPrice)
         });
 
-        alert('Historial actualizado y consulta finalizada');
+        await Swal.fire({
+          icon: 'success',
+          title: 'Historial Actualizado',
+          text: 'Se ha guardado la nota de evolución y finalizado la consulta.',
+          confirmButtonColor: '#0f172a'
+        });
         navigate('/doctor/schedule');
       } else {
-        alert('Cambios guardados exitosamente');
+        await Swal.fire({
+          icon: 'success',
+          title: 'Cambios Guardados',
+          text: 'El expediente médico ha sido actualizado exitosamente.',
+          confirmButtonColor: '#0f172a',
+          timer: 2000,
+          timerProgressBar: true
+        });
         fetchData();
       }
     } catch (error) {
-      alert(error.response?.data?.message || 'Error al guardar');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al Guardar',
+        text: error.response?.data?.message || 'No se pudieron sincronizar los cambios.',
+        confirmButtonColor: '#0f172a'
+      });
     } finally {
       setSaving(false);
     }
@@ -143,7 +161,12 @@ export default function MedicalRecordEditor() {
   const handleSubmitPrescription = async () => {
     try {
       if (medications.some(m => !m.name.trim())) {
-        alert('Por favor agrega el nombre del medicamento');
+        Swal.fire({
+          icon: 'warning',
+          title: 'Datos Incompletos',
+          text: 'Por favor agrega el nombre del medicamento.',
+          confirmButtonColor: '#0f172a'
+        });
         return;
       }
       await api.post(`/prescriptions/patient/${patientId}`, {
@@ -154,14 +177,24 @@ export default function MedicalRecordEditor() {
       setShowPrescriptionModal(false);
       setMedications([{ name: '', dose: '', frequency: '', duration: '' }]);
       setPrescInstructions('');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Receta Generada',
+        text: 'La receta se ha emitido correctamente y está lista para imprimir.',
+        confirmButtonColor: '#0f172a'
+      });
       fetchData();
     } catch (error) {
-      alert('Error al generar receta');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'No se pudo generar la receta electrónica.',
+        confirmButtonColor: '#0f172a'
+      });
     }
   };
 
-  // Estado para la impresión (Fail-safe method)
-  const [printData, setPrintData] = useState(null);
+  // No se usa printData, limpieza de estado muerto
 
   // Función para generar la impresión real (Método Iframe Robusto)
   const handlePrint = (p) => {
@@ -175,6 +208,9 @@ export default function MedicalRecordEditor() {
     document.body.appendChild(iframe);
 
     const doc = iframe.contentWindow.document;
+
+    // Determinar branding: Prioridad a la clínica de la cita, fallback a la clínica activa
+    const branding = p.appointment?.clinic || activeClinic;
     
     // Contenido HTML de la Receta
     const html = `
@@ -205,15 +241,19 @@ export default function MedicalRecordEditor() {
             .signature-area { width: 250px; text-align: center; }
             .signature-img { max-height: 90px; margin-bottom: 10px; mix-blend-multiply; }
             .signature-line { border-top: 2px solid #0f172a; padding-top: 8px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; }
+            @media print {
+              body { padding: 20px; }
+              .no-print { display: none; }
+            }
           </style>
         </head>
         <body>
           <div class="header">
-            ${activeClinic?.logo_url ? '<img src="' + activeClinic.logo_url + '" class="logo" />' : '<div class="clinic-name">DentalCare</div>'}
+            ${branding?.logo_url ? `<img src="${branding.logo_url}" class="logo" />` : '<div class="clinic-name">DentalCare</div>'}
             <div class="clinic-info">
-              <p class="clinic-name">${activeClinic?.name || ''}</p>
-              <p class="clinic-detail">${activeClinic?.address || ''}</p>
-              <p class="clinic-detail">${activeClinic?.phone ? `Tel: ${activeClinic.phone}` : ''}</p>
+              <p class="clinic-name">${branding?.name || 'DentalCare'}</p>
+              <p class="clinic-detail">${branding?.address || 'Dirección no disponible'}</p>
+              <p class="clinic-detail">${branding?.phone ? `Tel: ${branding.phone}` : ''}</p>
             </div>
           </div>
 
@@ -254,10 +294,32 @@ export default function MedicalRecordEditor() {
           <div class="footer">
             <div style="font-size: 8px; color: #cbd5e1; font-family: monospace;">UUID: ${p.id.toUpperCase()}</div>
             <div class="signature-area">
-              ${p.doctor.signature_stamp_url ? '<img src="' + p.doctor.signature_stamp_url + '" class="signature-img" />' : '<div style="height: 90px;"></div>'}
+              ${p.doctor.signature_stamp_url ? `<img src="${p.doctor.signature_stamp_url}" class="signature-img" />` : '<div style="height: 90px;"></div>'}
               <div class="signature-line">Firma y Sello</div>
             </div>
           </div>
+
+          <script>
+            window.onload = () => {
+              // Esperar a que las imágenes carguen también
+              const images = Array.from(document.getElementsByTagName('img'));
+              const promises = images.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise(resolve => {
+                  img.onload = resolve;
+                  img.onerror = resolve;
+                });
+              });
+
+              Promise.all(promises).then(() => {
+                // Pequeño delay extra para que el motor de renderizado asiente (especialmente fuentes)
+                setTimeout(() => {
+                  window.focus();
+                  window.print();
+                }, 250);
+              });
+            };
+          </script>
         </body>
       </html>
     `;
@@ -266,19 +328,15 @@ export default function MedicalRecordEditor() {
     doc.write(html);
     doc.close();
 
-    // Trigger de impresión desde el padre para máxima compatibilidad
-    setTimeout(() => {
-      if (iframe.contentWindow) {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        // Limpieza diferida
-        setTimeout(() => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-        }, 1500);
-      }
-    }, 800);
+    // Limpieza diferida: Eliminamos el iframe después de que el usuario cierre el diálogo de impresión
+    // El evento 'afterprint' es ideal para esto
+    iframe.contentWindow.addEventListener('afterprint', () => {
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 500);
+    });
   };
 
   if (loading) return (

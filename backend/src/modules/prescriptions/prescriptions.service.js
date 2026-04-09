@@ -20,7 +20,7 @@ class PrescriptionService {
       },
       include: {
         doctor: {
-           select: { first_name: true, last_name: true, license_number: true, specialty: true }
+           select: { first_name: true, last_name: true, license_number: true, specialty: true, signature_stamp_url: true }
         },
         patient: {
            select: { first_name: true, last_name: true, date_of_birth: true, gender: true }
@@ -41,6 +41,13 @@ class PrescriptionService {
         },
         patient: {
            select: { first_name: true, last_name: true, date_of_birth: true, gender: true }
+        },
+        appointment: {
+          include: {
+            clinic: {
+              select: { name: true, address: true, phone: true, logo_url: true }
+            }
+          }
         }
       },
       orderBy: { created_at: 'desc' }

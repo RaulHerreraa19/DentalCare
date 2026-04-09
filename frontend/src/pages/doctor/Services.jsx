@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../lib/axios';
 import { Plus, Settings, Trash2, ListChecks, DollarSign } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function DoctorServices() {
   const [services, setServices] = useState([]);
@@ -30,18 +31,56 @@ export default function DoctorServices() {
       await api.post('/services', { name, price: parseFloat(price) });
       setName('');
       setPrice('');
+      Swal.fire({
+        icon: 'success',
+        title: 'Servicio Registrado',
+        text: 'El nuevo concepto ha sido añadido a tu catálogo profesional.',
+        confirmButtonColor: '#0f172a',
+        timer: 1500
+      });
       fetchServices();
     } catch (error) {
-      alert('Error en el registro del servicio');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'No se pudo registrar el servicio en este momento.',
+        confirmButtonColor: '#0f172a'
+      });
     }
   };
 
   const handleDelete = async (id) => {
-    if(!window.confirm('¿Confirmar eliminación del servicio?')) return;
-    try {
-      await api.delete(`/services/${id}`);
-      fetchServices();
-    } catch (err) {}
+    const result = await Swal.fire({
+      title: '¿Confirmar eliminación?',
+      text: "Esta acción retirará el concepto de tu catálogo profesional.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#0f172a',
+      cancelButtonColor: '#cbd5e1',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.delete(`/services/${id}`);
+        Swal.fire({
+          icon: 'success',
+          title: 'Eliminado',
+          text: 'El servicio ha sido removido exitosamente.',
+          confirmButtonColor: '#0f172a',
+          timer: 1500
+        });
+        fetchServices();
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'No se pudo eliminar el servicio.',
+          confirmButtonColor: '#0f172a'
+        });
+      }
+    }
   };
 
   if (loading && services.length === 0) return <div className="p-8 text-slate-600 font-medium italic text-center">Cargando catálogo profesional...</div>;

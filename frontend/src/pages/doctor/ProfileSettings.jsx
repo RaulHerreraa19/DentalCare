@@ -14,6 +14,19 @@ import {
   Camera
 } from 'lucide-react';
 import api from '../../lib/axios';
+import Swal from 'sweetalert2';
+
+const dataURLToBlob = (dataURL) => {
+  const [meta, base64] = dataURL.split(',');
+  const mimeMatch = meta.match(/data:(.*?);base64/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mime });
+};
 
 export default function ProfileSettings() {
   const [loading, setLoading] = useState(true);
@@ -61,9 +74,20 @@ export default function ProfileSettings() {
     try {
       setSaving(true);
       await api.patch('/users/me', profile);
-      alert('Perfil actualizado exitosamente');
+      Swal.fire({
+        icon: 'success',
+        title: 'Perfil Actualizado',
+        text: 'Tus credenciales profesionales han sido guardadas correctamente.',
+        confirmButtonColor: '#0f172a',
+        timer: 1500
+      });
     } catch (error) {
-      alert('Error al guardar perfil');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Guardado',
+        text: 'No se pudieron actualizar los datos del perfil.',
+        confirmButtonColor: '#0f172a'
+      });
     } finally {
       setSaving(false);
     }
@@ -75,23 +99,46 @@ export default function ProfileSettings() {
 
   const saveSignature = async () => {
     try {
-      if (sigCanvas.current.isEmpty()) {
-        alert('Por favor dibuja tu firma primero');
+      if (!sigCanvas.current || typeof sigCanvas.current.isEmpty !== 'function' || sigCanvas.current.isEmpty()) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Firma Vacía',
+          text: 'Por favor dibuja tu firma en el panel antes de guardar.',
+          confirmButtonColor: '#0f172a'
+        });
         return;
       }
       
       setSaving(true);
-      const dataURL = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
-      
-      const { data } = await api.post('/uploads/signature', { base64: dataURL });
+      const canvas = sigCanvas.current.getCanvas();
+      const dataURL = canvas.toDataURL('image/png');
+
+      const blob = dataURLToBlob(dataURL);
+      const formData = new FormData();
+      formData.append('signature', blob, 'signature.png');
+
+      const { data } = await api.post('/uploads/signature', formData);
       
       // Actualizar perfil con la nueva URL de firma
       await api.patch('/users/me', { signature_stamp_url: data.data.url });
       
       setProfile(prev => ({ ...prev, signature_stamp_url: data.data.url }));
-      alert('Firma guardada correctamente en el servidor');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Firma Registrada',
+        text: 'Tu firma digital ha sido vinculada exitosamente para el recetario.',
+        confirmButtonColor: '#0f172a',
+        timer: 2000
+      });
     } catch (error) {
-      alert('Error crítico al subir firma a Azure: ' + (error.response?.data?.message || error.message));
+      console.error('Error uploading signature:', error);
+      const backendMessage = error?.response?.data?.message;
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Carga',
+        text: backendMessage || error?.message || 'Hubo un problema al subir la firma al servidor de activos.',
+        confirmButtonColor: '#0f172a'
+      });
     } finally {
       setSaving(false);
     }
@@ -112,9 +159,20 @@ export default function ProfileSettings() {
       await api.patch(`/clinics/${clinicId}`, { logo_url: data.data.url });
       
       fetchClinics();
-      alert('Logo actualizado correctamente');
+      Swal.fire({
+        icon: 'success',
+        title: 'Logo Actualizado',
+        text: 'La identidad visual de la sucursal ha sido renovada.',
+        confirmButtonColor: '#0f172a',
+        timer: 1500
+      });
     } catch (error) {
-      alert('Error al subir logo');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Identidad',
+        text: 'No se pudo procesar la carga del logotipo corporativo.',
+        confirmButtonColor: '#0f172a'
+      });
     } finally {
       setSaving(false);
     }

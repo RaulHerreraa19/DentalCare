@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import { UserPlus, Search, User, Phone, Mail, XCircle, FileText } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -41,12 +42,22 @@ export default function Patients() {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/patients', formData);
-      setShowModal(false);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Paciente Registrado',
+        text: 'El nuevo paciente ha sido dado de alta correctamente.',
+        confirmButtonColor: '#0f172a',
+        timer: 2000
+      });
       fetchPatients();
       setFormData({ first_name: '', last_name: '', phone: '', email: '', date_of_birth: '', gender: '', address: '' });
     } catch (error) {
-      alert(error.response?.data?.message || 'Error en el registro');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Registro',
+        text: error.response?.data?.message || 'No se pudo completar el registro.',
+        confirmButtonColor: '#0f172a'
+      });
     }
   };
 

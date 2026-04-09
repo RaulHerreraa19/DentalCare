@@ -5,6 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import api from '../../lib/axios';
 import { Calendar as CalendarIcon, Filter, MapPin, User, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function Calendar() {
   const [appointments, setAppointments] = useState([]);
@@ -190,9 +191,21 @@ function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) 
     e.preventDefault();
     try {
       await api.post('/appointments', { ...formData, clinic_id: clinicId });
+      Swal.fire({
+        icon: 'success',
+        title: 'Cita Agendada',
+        text: 'La consulta ha sido reservada correctamente.',
+        confirmButtonColor: '#0f172a',
+        timer: 1500
+      });
       onSuccess();
     } catch (error) {
-      alert(error.response?.data?.message || 'Error al agendar cita');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Agenda',
+        text: error.response?.data?.message || 'No se pudo registrar la cita en este horario.',
+        confirmButtonColor: '#0f172a'
+      });
     }
   };
 
@@ -271,21 +284,56 @@ function BillingModal({ appointment, onClose, onSuccess }) {
   const handlePayment = async () => {
     try {
       await api.post(`/billing/collect/${appointment.id}`, { finalAmount });
+      Swal.fire({
+        icon: 'success',
+        title: 'Pago Procesado',
+        text: 'La transacción ha sido registrada en tesorería.',
+        confirmButtonColor: '#0f172a',
+        timer: 1500
+      });
       onSuccess();
     } catch (error) {
-      alert(error.response?.data?.message || 'Error al procesar el pago');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Cobro',
+        text: error.response?.data?.message || 'No se pudo procesar la liquidación.',
+        confirmButtonColor: '#0f172a'
+      });
     }
   };
 
   const handleCancel = async () => {
-     if(window.confirm('¿Confirmar cancelación definitiva de esta cita?')) {
-        try {
-          await api.patch(`/appointments/${appointment.id}/status`, { status: 'CANCELLED' });
-          onSuccess();
-        } catch (error) {
-          alert('Error en la operación');
-        }
-     }
+    const result = await Swal.fire({
+      title: '¿Confirmar Cancelación?',
+      text: "Esta acción marcará la cita como anulada definitivamente.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#cbd5e1',
+      confirmButtonText: 'Sí, Anular Cita',
+      cancelButtonText: 'Mantener'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.patch(`/appointments/${appointment.id}/status`, { status: 'CANCELLED' });
+        Swal.fire({
+          icon: 'success',
+          title: 'Cita Anulada',
+          text: 'La cita ha sido retirada de la agenda operativa.',
+          confirmButtonColor: '#0f172a',
+          timer: 1500
+        });
+        onSuccess();
+      } catch (error) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'No se pudo completar la anulación.',
+          confirmButtonColor: '#0f172a'
+        });
+      }
+    }
   };
 
   return (

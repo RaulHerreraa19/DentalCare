@@ -11,6 +11,7 @@ import OrganizationDetails from './pages/superadmin/OrganizationDetails';
 import OwnerDashboard from './pages/owner/Dashboard';
 import OwnerClinics from './pages/owner/Clinics';
 import OwnerTeam from './pages/owner/Team';
+import WhatsAppSettings from './pages/owner/WhatsAppSettings';
 import DoctorServices from './pages/doctor/Services';
 import DoctorDashboard from './pages/doctor/Dashboard';
 import CashRegister from './pages/reception/CashRegister';
@@ -88,6 +89,7 @@ function App() {
           <Route path="/owner/dashboard" element={<ProtectedRoute allowedRoles={['OWNER']}><OwnerDashboard /></ProtectedRoute>} />
           <Route path="/owner/clinics" element={<ProtectedRoute allowedRoles={['OWNER']}><OwnerClinics /></ProtectedRoute>} />
           <Route path="/owner/team" element={<ProtectedRoute allowedRoles={['OWNER']}><OwnerTeam /></ProtectedRoute>} />
+          <Route path="/owner/whatsapp" element={<ProtectedRoute allowedRoles={['OWNER']}><WhatsAppSettings /></ProtectedRoute>} />
           
           <Route path="/doctor/services" element={<ProtectedRoute allowedRoles={['DOCTOR']}><DoctorServices /></ProtectedRoute>} />
           <Route path="/doctor/schedule" element={<ProtectedRoute allowedRoles={['DOCTOR']}><DoctorSchedule /></ProtectedRoute>} />
