@@ -6,10 +6,11 @@ class RemindersController {
   static async sendNow(req, res, next) {
     try {
       const { appointmentId } = req.params;
+      const force = req.body?.force === true;
       const result = await RemindersService.sendReminderForAppointment(
         appointmentId,
         req.user.id,
-        true,
+        force,
       );
       return ApiResponse.success(res, "Recordatorio procesado", result);
     } catch (error) {

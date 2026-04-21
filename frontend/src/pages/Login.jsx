@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Activity, AlertCircle } from 'lucide-react';
+import { isValidEmail, normalizeEmail } from '../lib/validators';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -15,9 +16,20 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const safeEmail = normalizeEmail(email);
+    if (!isValidEmail(safeEmail)) {
+      setError('Ingresa un correo electrónico válido.');
+      return;
+    }
+    if (!password.trim()) {
+      setError('Ingresa una contraseña válida.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const user = await login(email, password);
+      const user = await login(safeEmail, password);
       if (user.role === 'SUPER_ADMIN') {
         navigate('/superadmin/dashboard');
       } else {

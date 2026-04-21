@@ -4,6 +4,7 @@ import { UserPlus, Search, User, Phone, Mail, XCircle, FileText } from 'lucide-r
 import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from '../../lib/validators';
 
 export default function Patients() {
   const [patients, setPatients] = useState([]);
@@ -41,7 +42,35 @@ export default function Patients() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+
+    const safeEmail = formData.email ? normalizeEmail(formData.email) : '';
+    if (safeEmail && !isValidEmail(safeEmail)) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Correo inválido',
+        text: 'Ingresa un correo electrónico válido para el paciente.',
+        confirmButtonColor: '#0f172a'
+      });
+      return;
+    }
+
+    if (!isValidPhone(formData.phone)) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Teléfono inválido',
+        text: 'El teléfono debe contener entre 8 y 15 dígitos.',
+        confirmButtonColor: '#0f172a'
+      });
+      return;
+    }
+
     try {
+      await api.post('/patients', {
+        ...formData,
+        email: safeEmail,
+        phone: normalizePhone(formData.phone)
+      });
+
       await Swal.fire({
         icon: 'success',
         title: 'Paciente Registrado',
@@ -150,7 +179,7 @@ export default function Patients() {
                        {user?.role === 'DOCTOR' ? (
                         <button 
                           onClick={() => navigate(`/doctor/medical-records/${p.id}`)}
-                          className="text-[11px] font-black text-slate-900 border border-slate-200 px-3 py-1.5 rounded uppercase tracking-wider hover:bg-slate-50 transition-colors shadow-sm flex items-center inline-flex"
+                          className="text-[11px] font-black text-slate-900 border border-slate-200 px-3 py-1.5 rounded uppercase tracking-wider hover:bg-slate-50 transition-colors shadow-sm inline-flex items-center"
                         >
                           <FileText className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
                           Expediente

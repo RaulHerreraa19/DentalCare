@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../../lib/axios';
 import { Plus, Building, Lock, ChevronDown, ChevronUp, MapPin, Edit3, Image as ImageIcon, Phone, Save, X, Building2 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { isValidPhone, normalizePhone } from '../../lib/validators';
 
 export default function OwnerClinics() {
   const [clinics, setClinics] = useState([]);
@@ -154,8 +155,21 @@ function ClinicRow({ clinic, onUpdate }) {
   }, [expanded]);
 
   const handleUpdate = async () => {
+    if (editData.phone && !isValidPhone(editData.phone)) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Teléfono inválido',
+        text: 'El teléfono de atención debe contener entre 8 y 15 dígitos.',
+        confirmButtonColor: '#0f172a'
+      });
+      return;
+    }
+
     try {
-      await api.patch(`/clinics/${clinic.id}`, editData);
+      await api.patch(`/clinics/${clinic.id}`, {
+        ...editData,
+        phone: editData.phone ? normalizePhone(editData.phone) : ''
+      });
       setIsEditing(false);
       await Swal.fire({
         icon: 'success',

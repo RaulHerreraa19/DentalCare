@@ -239,8 +239,8 @@ class WhatsAppService {
         appointmentId,
       });
       return {
-        skipped: false,
-        messageId: `dryrun-${appointmentId}`,
+        skipped: true,
+        messageId: null,
         reason: "dry-run",
       };
     }

@@ -4,6 +4,9 @@ const AuditLogService = require("../audit/audit.service");
 const WhatsAppService = require("../../services/whatsapp.service");
 
 const REMINDER_TYPE = "WHATSAPP_CONFIRM_24H";
+const REMINDER_LOCK_NAMESPACE = 91324;
+const INBOUND_MESSAGE_TTL_MS = 24 * 60 * 60 * 1000;
+const inboundMessageCache = new Map();
 
 const normalizePhone = (rawPhone) => {
   if (!rawPhone) return null;
@@ -21,7 +24,130 @@ const normalizePhone = (rawPhone) => {
   return digits;
 };
 
+const UUID_REGEX =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
+
+const extractAppointmentIdFromContent = (content) => {
+  if (!content) return null;
+  const match = String(content).match(UUID_REGEX);
+  return match ? match[0] : null;
+};
+
+const shouldProcessInboundMessage = (messageId) => {
+  if (!messageId) return true;
+
+  const now = Date.now();
+
+  for (const [id, seenAt] of inboundMessageCache.entries()) {
+    if (now - seenAt > INBOUND_MESSAGE_TTL_MS) {
+      inboundMessageCache.delete(id);
+    }
+  }
+
+  if (inboundMessageCache.has(messageId)) {
+    return false;
+  }
+
+  inboundMessageCache.set(messageId, now);
+  return true;
+};
+
 class RemindersService {
+  static async tryAcquireReminderLock(appointmentId) {
+    if (!appointmentId) return false;
+
+    const result = await db.$queryRaw`
+      SELECT pg_try_advisory_lock(${REMINDER_LOCK_NAMESPACE}, hashtext(${appointmentId})) AS locked
+    `;
+
+    return Boolean(result?.[0]?.locked);
+  }
+
+  static async releaseReminderLock(appointmentId) {
+    if (!appointmentId) return;
+
+    await db.$queryRaw`
+      SELECT pg_advisory_unlock(${REMINDER_LOCK_NAMESPACE}, hashtext(${appointmentId}))
+    `;
+  }
+
+  static async findInboundReminderMatch({ from, content, messageContextId }) {
+    if (messageContextId) {
+      const byContext = await db.appointmentReminder.findFirst({
+        where: {
+          reminder_type: REMINDER_TYPE,
+          status: "SENT",
+          provider_message_id: messageContextId,
+        },
+        include: {
+          appointment: {
+            include: {
+              patient: { select: { phone: true } },
+            },
+          },
+        },
+      });
+
+      if (byContext) return byContext;
+    }
+
+    const appointmentIdFromText = extractAppointmentIdFromContent(content);
+    if (appointmentIdFromText) {
+      const byAppointmentId = await db.appointmentReminder.findFirst({
+        where: {
+          reminder_type: REMINDER_TYPE,
+          status: "SENT",
+          appointment_id: appointmentIdFromText,
+          sent_at: {
+            gte: new Date(Date.now() - 72 * 60 * 60 * 1000),
+          },
+        },
+        include: {
+          appointment: {
+            include: {
+              patient: { select: { phone: true } },
+            },
+          },
+        },
+      });
+
+      if (
+        byAppointmentId &&
+        normalizePhone(byAppointmentId.appointment?.patient?.phone) === from
+      ) {
+        return byAppointmentId;
+      }
+    }
+
+    const recent = await db.appointmentReminder.findMany({
+      where: {
+        reminder_type: REMINDER_TYPE,
+        status: "SENT",
+        sent_at: {
+          gte: new Date(Date.now() - 48 * 60 * 60 * 1000),
+        },
+      },
+      include: {
+        appointment: {
+          include: {
+            patient: { select: { phone: true } },
+          },
+        },
+      },
+      orderBy: { sent_at: "desc" },
+      take: 50,
+    });
+
+    const matches = recent.filter(
+      (r) => normalizePhone(r.appointment?.patient?.phone) === from,
+    );
+
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1) return null;
+
+    return null;
+  }
+
   static getWindowMinutes(config) {
     const parsed = Number(config?.windowMinutes ?? 15);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
@@ -70,29 +196,37 @@ class RemindersService {
       };
     }
 
-    const reminder = await db.appointmentReminder.upsert({
-      where: {
-        appointment_id_reminder_type: {
-          appointment_id: appointment.id,
-          reminder_type: REMINDER_TYPE,
-        },
-      },
-      create: {
-        appointment_id: appointment.id,
-        reminder_type: REMINDER_TYPE,
-        scheduled_for: new Date(appointment.start_time),
-        status: "PENDING",
-      },
-      update: {
-        scheduled_for: new Date(appointment.start_time),
-      },
-    });
-
-    if (!force && reminder.status === "SENT") {
-      return { skipped: true, reason: "already-sent", reminder };
-    }
+    let lockAcquired = false;
+    let reminder = null;
 
     try {
+      lockAcquired = await this.tryAcquireReminderLock(appointment.id);
+      if (!lockAcquired) {
+        return { skipped: true, reason: "in-progress" };
+      }
+
+      reminder = await db.appointmentReminder.upsert({
+        where: {
+          appointment_id_reminder_type: {
+            appointment_id: appointment.id,
+            reminder_type: REMINDER_TYPE,
+          },
+        },
+        create: {
+          appointment_id: appointment.id,
+          reminder_type: REMINDER_TYPE,
+          scheduled_for: new Date(appointment.start_time),
+          status: "PENDING",
+        },
+        update: {
+          scheduled_for: new Date(appointment.start_time),
+        },
+      });
+
+      if (!force && reminder.status === "SENT") {
+        return { skipped: true, reason: "already-sent", reminder };
+      }
+
       const sendResult = await WhatsAppService.sendAppointmentConfirmation({
         to: phone,
         patientName: `${appointment.patient.first_name} ${appointment.patient.last_name}`,
@@ -127,14 +261,18 @@ class RemindersService {
 
       return { skipped: sendResult.skipped, reminder: updated };
     } catch (error) {
-      const updated = await db.appointmentReminder.update({
-        where: { id: reminder.id },
-        data: {
-          status: "FAILED",
-          retry_count: { increment: 1 },
-          last_error: error.message || "Error desconocido en envío WhatsApp",
-        },
-      });
+      let updated = null;
+
+      if (reminder?.id) {
+        updated = await db.appointmentReminder.update({
+          where: { id: reminder.id },
+          data: {
+            status: "FAILED",
+            retry_count: { increment: 1 },
+            last_error: error.message || "Error desconocido en envío WhatsApp",
+          },
+        });
+      }
 
       await AuditLogService.log({
         userId,
@@ -148,9 +286,15 @@ class RemindersService {
       });
 
       throw new AppError(
-        updated.last_error || "No se pudo enviar el recordatorio.",
+        updated?.last_error ||
+          error.message ||
+          "No se pudo enviar el recordatorio.",
         500,
       );
+    } finally {
+      if (lockAcquired) {
+        await this.releaseReminderLock(appointment.id);
+      }
     }
   }
 
@@ -168,10 +312,10 @@ class RemindersService {
       const windowMinutes = this.getWindowMinutes({
         windowMinutes: config.window_minutes,
       });
-      const targetStart = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      const targetEnd = new Date(
-        targetStart.getTime() + windowMinutes * 60 * 1000,
-      );
+      const lookbackMinutes = Math.max(windowMinutes, 5);
+      const nominalTarget = now.getTime() + 24 * 60 * 60 * 1000;
+      const targetStart = new Date(nominalTarget - lookbackMinutes * 60 * 1000);
+      const targetEnd = new Date(nominalTarget + windowMinutes * 60 * 1000);
 
       const orgAppointments = await db.appointment.findMany({
         where: {
@@ -260,6 +404,7 @@ class RemindersService {
   static async processWebhookPayload(payload) {
     const incomingMessages = [];
     const entries = payload?.entry || [];
+    let duplicateInboundIgnored = 0;
 
     for (const entry of entries) {
       const changes = entry?.changes || [];
@@ -271,8 +416,16 @@ class RemindersService {
     }
 
     for (const message of incomingMessages) {
+      const inboundMessageId = message?.id || null;
+      if (!shouldProcessInboundMessage(inboundMessageId)) {
+        duplicateInboundIgnored += 1;
+        continue;
+      }
+
       const from = normalizePhone(message?.from);
       if (!from) continue;
+
+      const messageContextId = message?.context?.id || null;
 
       const textBody =
         message?.text?.body ||
@@ -301,35 +454,19 @@ class RemindersService {
         continue;
       }
 
-      const recent = await db.appointmentReminder.findMany({
-        where: {
-          reminder_type: REMINDER_TYPE,
-          status: "SENT",
-          sent_at: {
-            gte: new Date(Date.now() - 48 * 60 * 60 * 1000),
-          },
-        },
-        include: {
-          appointment: {
-            include: {
-              patient: { select: { phone: true } },
-            },
-          },
-        },
-        orderBy: { sent_at: "desc" },
-        take: 50,
+      const match = await this.findInboundReminderMatch({
+        from,
+        content,
+        messageContextId,
       });
 
-      const match = recent.find(
-        (r) => normalizePhone(r.appointment?.patient?.phone) === from,
-      );
       if (!match) {
         await AuditLogService.log({
           userId: null,
           action: "WHATSAPP_INBOUND_NO_MATCH",
           targetModel: "APPOINTMENT",
           targetId: null,
-          metadata: { from, content },
+          metadata: { from, content, messageContextId },
         });
         continue;
       }
@@ -341,6 +478,24 @@ class RemindersService {
           targetModel: "APPOINTMENT",
           targetId: match.appointment_id,
           metadata: { from, content },
+        });
+        continue;
+      }
+
+      if (
+        !match.appointment ||
+        !["PENDING", "CONFIRMED"].includes(match.appointment.status)
+      ) {
+        await AuditLogService.log({
+          userId: null,
+          action: "WHATSAPP_INBOUND_STALE_IGNORED",
+          targetModel: "APPOINTMENT",
+          targetId: match.appointment_id,
+          metadata: {
+            from,
+            content,
+            appointmentStatus: match.appointment?.status || null,
+          },
         });
         continue;
       }
@@ -367,7 +522,10 @@ class RemindersService {
       });
     }
 
-    return { processed: incomingMessages.length };
+    return {
+      processed: incomingMessages.length,
+      duplicateInboundIgnored,
+    };
   }
 
   static async getConfigStatus(organizationId) {

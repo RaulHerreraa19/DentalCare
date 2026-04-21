@@ -1,6 +1,13 @@
 const db = require("../../config/database");
 const bcrypt = require("bcryptjs");
 const AppError = require("../../utils/AppError");
+const {
+  assertEmail,
+  assertStrongPassword,
+  assertRequiredText,
+  assertOptionalPhone,
+  assertOptionalText,
+} = require("../../utils/validators");
 
 class UsersService {
   static async inviteEmployee(organizationId, data) {
@@ -20,6 +27,14 @@ class UsersService {
       throw new AppError("Rol inválido para invitación", 400);
     }
 
+    const safeEmail = assertEmail(email, "El correo del colaborador");
+    const safePassword = assertStrongPassword(
+      password,
+      "La contraseña temporal",
+    );
+    const safeFirstName = assertRequiredText(first_name, "El nombre", 2, 80);
+    const safeLastName = assertRequiredText(last_name, "El apellido", 2, 80);
+
     // Normalizar office_ids a array
     const officesToAssign = office_ids || (office_id ? [office_id] : []);
 
@@ -30,10 +45,10 @@ class UsersService {
       );
     }
 
-    const exists = await db.user.findUnique({ where: { email } });
+    const exists = await db.user.findUnique({ where: { email: safeEmail } });
     if (exists) throw new AppError("Email ya registrado", 400);
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(safePassword, 10);
 
     // clinics = array of clinic_ids
     const clinicAssignments =
@@ -45,9 +60,9 @@ class UsersService {
     return await db.user.create({
       data: {
         organization_id: organizationId,
-        email,
-        first_name,
-        last_name,
+        email: safeEmail,
+        first_name: safeFirstName,
+        last_name: safeLastName,
         password_hash: hashedPassword,
         role,
         supervisor_id: supervisor_id || null,
@@ -121,8 +136,20 @@ class UsersService {
     }
 
     const updateData = {};
-    if (first_name !== undefined) updateData.first_name = first_name;
-    if (last_name !== undefined) updateData.last_name = last_name;
+    if (first_name !== undefined)
+      updateData.first_name = assertRequiredText(
+        first_name,
+        "El nombre",
+        2,
+        80,
+      );
+    if (last_name !== undefined)
+      updateData.last_name = assertRequiredText(
+        last_name,
+        "El apellido",
+        2,
+        80,
+      );
     if (is_active !== undefined) updateData.is_active = is_active;
     if (supervisor_id !== undefined)
       updateData.supervisor_id = supervisor_id || null;
@@ -182,6 +209,47 @@ class UsersService {
       if (data[field] !== undefined) {
         updateData[field] = data[field];
       }
+    }
+
+    if (updateData.first_name !== undefined) {
+      updateData.first_name = assertRequiredText(
+        updateData.first_name,
+        "El nombre",
+        2,
+        80,
+      );
+    }
+    if (updateData.last_name !== undefined) {
+      updateData.last_name = assertRequiredText(
+        updateData.last_name,
+        "El apellido",
+        2,
+        80,
+      );
+    }
+    if (updateData.phone !== undefined) {
+      updateData.phone = assertOptionalPhone(updateData.phone, "El teléfono");
+    }
+    if (updateData.license_number !== undefined) {
+      updateData.license_number = assertOptionalText(
+        updateData.license_number,
+        "La cédula profesional",
+        40,
+      );
+    }
+    if (updateData.specialty !== undefined) {
+      updateData.specialty = assertOptionalText(
+        updateData.specialty,
+        "La especialidad",
+        120,
+      );
+    }
+    if (updateData.signature_stamp_url !== undefined) {
+      updateData.signature_stamp_url = assertOptionalText(
+        updateData.signature_stamp_url,
+        "La URL de firma",
+        500,
+      );
     }
 
     if (Object.keys(updateData).length === 0) {

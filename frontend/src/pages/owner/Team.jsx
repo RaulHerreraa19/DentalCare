@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../../lib/axios';
 import { UserPlus, Star, UserCheck, Shield, Edit2, X, Check } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { isStrongPassword, isValidEmail, normalizeEmail } from '../../lib/validators';
 
 export default function OwnerTeam() {
   const [employees, setEmployees] = useState([]);
@@ -97,6 +98,28 @@ export default function OwnerTeam() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const safeEmail = normalizeEmail(formData.email);
+
+    if (!isValidEmail(safeEmail)) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Correo inválido',
+        text: 'Ingresa un correo electrónico con formato válido.',
+        confirmButtonColor: '#0f172a'
+      });
+      return;
+    }
+
+    if (!editingUserId && !isStrongPassword(formData.password)) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Contraseña insegura',
+        text: 'La contraseña debe tener 8+ caracteres, mayúscula, minúscula, número y símbolo.',
+        confirmButtonColor: '#0f172a'
+      });
+      return;
+    }
+
     if (!formData.clinic_id) {
       Swal.fire({
         icon: 'warning',
@@ -118,10 +141,11 @@ export default function OwnerTeam() {
 
     try {
       if (editingUserId) {
-        await api.patch(`/users/${editingUserId}`, formData);
+        await api.patch(`/users/${editingUserId}`, { ...formData, email: safeEmail });
       } else {
         await api.post('/users/invite', {
           ...formData,
+          email: safeEmail,
           clinics: [formData.clinic_id]
         });
       }

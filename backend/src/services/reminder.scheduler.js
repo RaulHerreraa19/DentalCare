@@ -1,6 +1,7 @@
 const RemindersService = require("../modules/reminders/reminders.service");
 
 let timer = null;
+let isRunning = false;
 
 class ReminderScheduler {
   static start() {
@@ -11,11 +12,18 @@ class ReminderScheduler {
     );
 
     const run = async () => {
+      if (isRunning) {
+        return;
+      }
+
+      isRunning = true;
       try {
         const result = await RemindersService.processUpcoming24hReminders();
         console.log("📲 Reminder job result:", result);
       } catch (error) {
         console.error("❌ Reminder job failed:", error.message);
+      } finally {
+        isRunning = false;
       }
     };
 
@@ -29,6 +37,8 @@ class ReminderScheduler {
       clearInterval(timer);
       timer = null;
     }
+
+    isRunning = false;
   }
 }
 
