@@ -411,6 +411,12 @@ enum CashCategory {
   OTHER
 }
 
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+}
+
 model CashRegister {
   id              String        @id @default(uuid())
   organization_id String
@@ -420,6 +426,7 @@ model CashRegister {
   amount          Decimal       @db.Decimal(10, 2)
   description     String
   category        CashCategory  @default(OTHER)
+  payment_method  PaymentMethod?
   registered_by   String
   created_at      DateTime      @default(now())
 

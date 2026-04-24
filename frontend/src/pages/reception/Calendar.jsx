@@ -280,10 +280,11 @@ function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) 
 // ======================= MODAL DETALLES / COBRO (REDISEÑO FORMAL) =======================
 function BillingModal({ appointment, onClose, onSuccess }) {
   const [finalAmount, setFinalAmount] = useState(appointment.total_amount || 0);
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
 
   const handlePayment = async () => {
     try {
-      await api.post(`/billing/collect/${appointment.id}`, { finalAmount });
+      await api.post(`/billing/collect/${appointment.id}`, { finalAmount, paymentMethod });
       Swal.fire({
         icon: 'success',
         title: 'Pago Procesado',
@@ -389,6 +390,19 @@ function BillingModal({ appointment, onClose, onSuccess }) {
                    />
                  </div>
                  {appointment.total_amount > 0 && <p className="text-[10px] text-slate-400 mt-2 text-center font-bold">PROPUESTA MÉDICA ORIGINAL: ${appointment.total_amount}</p>}
+               </div>
+
+               <div>
+                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Método de Pago</label>
+                 <select
+                   className="w-full bg-white border border-slate-200 rounded p-3 text-sm font-bold text-slate-900 focus:ring-1 focus:ring-slate-900 outline-none"
+                   value={paymentMethod}
+                   onChange={(e) => setPaymentMethod(e.target.value)}
+                 >
+                   <option value="CASH">Efectivo</option>
+                   <option value="TRANSFER">Transferencia</option>
+                   <option value="CARD">Tarjeta / Terminal</option>
+                 </select>
                </div>
                
                <button onClick={handlePayment} className="w-full py-3 bg-slate-900 text-white rounded text-xs font-bold hover:bg-black transition-all shadow-lg flex items-center justify-center space-x-2 uppercase tracking-widest">

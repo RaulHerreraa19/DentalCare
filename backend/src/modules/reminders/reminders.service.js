@@ -539,6 +539,127 @@ class RemindersService {
       configInput,
     );
   }
+
+  static async sendTestMessage(organizationId, userId, payload = {}) {
+    const orgConfig = await WhatsAppService.getOrganizationConfig(organizationId);
+
+    const result = await WhatsAppService.sendTestMessage({
+      to: payload.to,
+      templateName: payload.templateName,
+      templateLang: payload.templateLang,
+      organizationConfig: orgConfig,
+    });
+
+    await AuditLogService.log({
+      userId: userId || null,
+      action: 'WHATSAPP_TEST_SENT',
+      targetModel: 'ORGANIZATION_WHATSAPP_CONFIG',
+      targetId: organizationId,
+      metadata: {
+        to: result.to,
+        templateName: result.templateName,
+        templateLang: result.templateLang,
+        messageId: result.messageId,
+      },
+    });
+
+    return result;
+  }
+
+  static async sendTestMessageToRegisteredPatients(
+    organizationId,
+    userId,
+    payload = {},
+  ) {
+    const orgConfig = await WhatsAppService.getOrganizationConfig(organizationId);
+
+    const patients = await db.patient.findMany({
+      where: {
+        organization_id: organizationId,
+        phone: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        phone: true,
+      },
+      orderBy: { created_at: 'desc' },
+      take: Number(payload.limit || 100),
+    });
+
+    const uniquePhones = new Map();
+    for (const patient of patients) {
+      const normalized = WhatsAppService.normalizePhone(patient.phone);
+      if (!normalized) continue;
+      if (!uniquePhones.has(normalized)) {
+        uniquePhones.set(normalized, patient);
+      }
+    }
+
+    if (uniquePhones.size === 0) {
+      throw new AppError(
+        'No hay pacientes con teléfono válido para prueba WhatsApp.',
+        400,
+      );
+    }
+
+    let sent = 0;
+    let failed = 0;
+    const details = [];
+
+    for (const [phone, patient] of uniquePhones.entries()) {
+      try {
+        const result = await WhatsAppService.sendTestMessage({
+          to: phone,
+          templateName: payload.templateName,
+          templateLang: payload.templateLang,
+          organizationConfig: orgConfig,
+        });
+
+        sent += 1;
+        details.push({
+          patient_id: patient.id,
+          patient_name: `${patient.first_name} ${patient.last_name}`.trim(),
+          to: result.to,
+          status: 'SENT',
+          messageId: result.messageId,
+        });
+      } catch (error) {
+        failed += 1;
+        details.push({
+          patient_id: patient.id,
+          patient_name: `${patient.first_name} ${patient.last_name}`.trim(),
+          to: phone,
+          status: 'FAILED',
+          error: error.message,
+        });
+      }
+    }
+
+    await AuditLogService.log({
+      userId: userId || null,
+      action: 'WHATSAPP_TEST_BULK_SENT',
+      targetModel: 'ORGANIZATION_WHATSAPP_CONFIG',
+      targetId: organizationId,
+      metadata: {
+        totalCandidates: uniquePhones.size,
+        sent,
+        failed,
+        templateName: String(payload.templateName || 'hello_world'),
+        templateLang: String(payload.templateLang || 'en_US'),
+      },
+    });
+
+    return {
+      totalCandidates: uniquePhones.size,
+      sent,
+      failed,
+      details,
+    };
+  }
 }
 
 module.exports = RemindersService;

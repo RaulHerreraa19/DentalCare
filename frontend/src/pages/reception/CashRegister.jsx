@@ -26,6 +26,7 @@ export default function CashRegister() {
   const [filters, setFilters] = useState({
     clinic_id: '',
     type: '',
+    payment_method: '',
     startDate: '',
     endDate: ''
   });
@@ -36,7 +37,8 @@ export default function CashRegister() {
     type: 'INCOME',
     amount: '',
     description: '',
-    category: 'OTHER'
+    category: 'OTHER',
+    payment_method: 'CASH'
   });
 
   useEffect(() => {
@@ -59,9 +61,22 @@ export default function CashRegister() {
     }
   };
 
+  const totals = history.reduce((acc, mov) => {
+    const amount = parseFloat(mov.amount || 0);
+    const signal = mov.type === 'INCOME' ? 1 : -1;
+
+    acc.net += signal * amount;
+    if (mov.payment_method === 'CASH') acc.cash += signal * amount;
+    if (mov.payment_method === 'TRANSFER') acc.transfer += signal * amount;
+    if (mov.payment_method === 'CARD') acc.card += signal * amount;
+
+    return acc;
+  }, { net: 0, cash: 0, transfer: 0, card: 0 });
+
   const handleCreateMovement = async (e) => {
     e.preventDefault();
     try {
+      await api.post('/billing/movement', newMovement);
       await Swal.fire({
         icon: 'success',
         title: 'Movimiento Registrado',
@@ -70,6 +85,15 @@ export default function CashRegister() {
         timer: 2000
       });
       fetchData();
+      setShowModal(false);
+      setNewMovement({
+        clinic_id: '',
+        type: 'INCOME',
+        amount: '',
+        description: '',
+        category: 'OTHER',
+        payment_method: 'CASH'
+      });
     } catch (error) {
       Swal.fire({
         icon: 'error',
@@ -128,6 +152,20 @@ export default function CashRegister() {
           </select>
         </div>
 
+        <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded border border-slate-100">
+          <User className="w-3.5 h-3.5 text-slate-400" />
+          <select 
+            className="bg-transparent border-none text-[11px] font-bold text-slate-700 focus:ring-0 outline-none cursor-pointer uppercase tracking-tight"
+            value={filters.payment_method}
+            onChange={(e) => setFilters({...filters, payment_method: e.target.value})}
+          >
+            <option value="">Todos los métodos</option>
+            <option value="CASH">Efectivo</option>
+            <option value="TRANSFER">Transferencia</option>
+            <option value="CARD">Tarjeta/Terminal</option>
+          </select>
+        </div>
+
         <div className="flex items-center space-x-3 bg-slate-50 px-4 py-1.5 rounded border border-slate-100">
           <Calendar className="w-3.5 h-3.5 text-slate-400" />
           <input 
@@ -147,6 +185,26 @@ export default function CashRegister() {
       </div>
 
       {/* Corporate Ledger Table */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-700">Efectivo Esperado</p>
+          <p className="text-2xl font-black text-emerald-900 mt-1">${totals.cash.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+          <p className="text-[10px] text-emerald-700 mt-1 font-semibold">Cierre de caja en físico</p>
+        </div>
+        <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-cyan-700">Neto Transferencia</p>
+          <p className="text-2xl font-black text-cyan-900 mt-1">${totals.transfer.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+        </div>
+        <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-violet-700">Neto Tarjeta/Terminal</p>
+          <p className="text-2xl font-black text-violet-900 mt-1">${totals.card.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+        </div>
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-600">Balance Neto Total</p>
+          <p className="text-2xl font-black text-slate-900 mt-1">${totals.net.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+        </div>
+      </div>
+
       <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -156,17 +214,18 @@ export default function CashRegister() {
                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Sucursal</th>
                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Descripción del Asiento</th>
                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Categoría</th>
+                <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Método</th>
                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Monto Neto</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 italic font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-slate-400 text-sm font-medium">Sincronizando flujos de caja...</td>
+                  <td colSpan="6" className="px-6 py-12 text-center text-slate-400 text-sm font-medium">Sincronizando flujos de caja...</td>
                 </tr>
               ) : history.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-slate-400 text-sm font-medium italic opacity-60 uppercase tracking-widest">Sin asientos contables en el periodo</td>
+                  <td colSpan="6" className="px-6 py-12 text-center text-slate-400 text-sm font-medium italic opacity-60 uppercase tracking-widest">Sin asientos contables en el periodo</td>
                 </tr>
               ) : (
                 history.map((mov) => (
@@ -190,6 +249,11 @@ export default function CashRegister() {
                     <td className="px-6 py-5">
                       <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-widest border border-slate-200">
                         {mov.category}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5">
+                      <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-widest border border-slate-200">
+                        {mov.payment_method === 'CASH' ? 'Efectivo' : mov.payment_method === 'TRANSFER' ? 'Transferencia' : mov.payment_method === 'CARD' ? 'Tarjeta/Terminal' : 'N/A'}
                       </span>
                     </td>
                     <td className={`px-6 py-5 text-right font-black text-sm tracking-tight ${
@@ -266,6 +330,19 @@ export default function CashRegister() {
                   <option value="SUPPLIES">Insumos y Logística</option>
                   <option value="RENT">Arrendamientos</option>
                   <option value="SALARY">Nómina / Honorarios</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Método de Pago</label>
+                <select 
+                  className="w-full border border-slate-200 rounded p-3 text-sm focus:ring-1 focus:ring-slate-900 outline-none bg-white font-semibold text-slate-700"
+                  value={newMovement.payment_method}
+                  onChange={(e) => setNewMovement({...newMovement, payment_method: e.target.value})}
+                >
+                  <option value="CASH">Efectivo</option>
+                  <option value="TRANSFER">Transferencia</option>
+                  <option value="CARD">Tarjeta / Terminal</option>
                 </select>
               </div>
 

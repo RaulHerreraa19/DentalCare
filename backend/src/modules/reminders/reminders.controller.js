@@ -80,6 +80,38 @@ class RemindersController {
     }
   }
 
+  static async sendTestMessage(req, res, next) {
+    try {
+      const result = await RemindersService.sendTestMessage(
+        req.user.organization_id,
+        req.user.id,
+        req.body || {},
+      );
+
+      return ApiResponse.success(res, 'Mensaje de prueba enviado', result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async sendTestToPatients(req, res, next) {
+    try {
+      const result = await RemindersService.sendTestMessageToRegisteredPatients(
+        req.user.organization_id,
+        req.user.id,
+        req.body || {},
+      );
+
+      return ApiResponse.success(
+        res,
+        'Prueba enviada a pacientes registrados',
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async verifyWebhook(req, res, next) {
     try {
       const challenge = await RemindersService.verifyWebhook(

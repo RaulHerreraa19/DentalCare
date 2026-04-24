@@ -21,8 +21,15 @@ export default function WhatsAppSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [sendingPatientsTest, setSendingPatientsTest] = useState(false);
   const [status, setStatus] = useState(null);
   const [config, setConfig] = useState(defaultConfig);
+  const [testData, setTestData] = useState({
+    to: '',
+    templateName: 'hello_world',
+    templateLang: 'en_US'
+  });
 
   const fetchStatus = async () => {
     try {
@@ -94,6 +101,68 @@ export default function WhatsAppSettings() {
       });
     } finally {
       setRunning(false);
+    }
+  };
+
+  const handleSendTest = async () => {
+    if (!testData.to) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Número requerido',
+        text: 'Ingresa el número de WhatsApp de prueba.'
+      });
+      return;
+    }
+
+    try {
+      setSendingTest(true);
+      const { data } = await api.post('/reminders/test-message', testData);
+      const result = data.data;
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Prueba enviada',
+        text: `Mensaje enviado a ${result.to}. ID: ${result.messageId || 'N/A'}`
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: 'error',
+        title: 'No se pudo enviar prueba',
+        text: error?.response?.data?.message || 'Error enviando mensaje de prueba.'
+      });
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const handleSendTestToPatients = async () => {
+    try {
+      setSendingPatientsTest(true);
+      const { data } = await api.post('/reminders/test-message/patients', {
+        templateName: testData.templateName,
+        templateLang: testData.templateLang,
+      });
+
+      const result = data.data;
+      const failedLines = (result.details || [])
+        .filter((item) => item.status === 'FAILED')
+        .slice(0, 5)
+        .map((item) => `${item.patient_name}: ${item.error}`)
+        .join(' | ');
+
+      Swal.fire({
+        icon: result.failed > 0 ? 'warning' : 'success',
+        title: 'Prueba a pacientes ejecutada',
+        text: `Candidatos: ${result.totalCandidates}, Enviados: ${result.sent}, Fallidos: ${result.failed}${failedLines ? `. Errores: ${failedLines}` : ''}`,
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: 'error',
+        title: 'No se pudo enviar prueba a pacientes',
+        text: error?.response?.data?.message || 'Error enviando prueba masiva a pacientes.',
+      });
+    } finally {
+      setSendingPatientsTest(false);
     }
   };
 
@@ -221,6 +290,38 @@ export default function WhatsAppSettings() {
             </label>
           </div>
         </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+          <h2 className="font-black text-sm uppercase tracking-widest text-slate-900">Prueba Manual de Envío</h2>
+
+          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Número destino (con lada)</label>
+          <input
+            value={testData.to}
+            onChange={(e) => setTestData({ ...testData, to: e.target.value })}
+            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
+            placeholder="5215512345678"
+          />
+
+          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Template de prueba</label>
+          <input
+            value={testData.templateName}
+            onChange={(e) => setTestData({ ...testData, templateName: e.target.value })}
+            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
+            placeholder="hello_world"
+          />
+
+          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Idioma template</label>
+          <input
+            value={testData.templateLang}
+            onChange={(e) => setTestData({ ...testData, templateLang: e.target.value })}
+            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
+            placeholder="en_US"
+          />
+
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Sugerencia para Meta sandbox: hello_world + en_US.
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -248,6 +349,24 @@ export default function WhatsAppSettings() {
         >
           {running ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
           Ejecutar Job 24h
+        </button>
+
+        <button
+          onClick={handleSendTestToPatients}
+          disabled={sendingPatientsTest}
+          className="px-6 py-3 rounded-xl bg-fuchsia-600 text-white text-xs font-black uppercase tracking-widest hover:bg-fuchsia-700 flex items-center gap-2"
+        >
+          {sendingPatientsTest ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+          Probar con Pacientes Registrados
+        </button>
+
+        <button
+          onClick={handleSendTest}
+          disabled={sendingTest}
+          className="px-6 py-3 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-widest hover:bg-indigo-700 flex items-center gap-2"
+        >
+          {sendingTest ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+          Enviar Prueba WhatsApp
         </button>
       </div>
     </div>

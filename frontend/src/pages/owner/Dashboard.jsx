@@ -3,12 +3,15 @@ import {
   DollarSign, 
   TrendingUp, 
   TrendingDown, 
-  Users, 
+  Users,
   Calendar, 
   Building,
   ArrowUpRight,
   RefreshCw,
-  BarChart3
+  BarChart3,
+  UserCircle2,
+  FileBarChart2,
+  Download
 } from 'lucide-react';
 import api from '../../lib/axios';
 
@@ -16,15 +19,21 @@ export default function OwnerDashboard() {
   const [stats, setStats] = useState(null);
   const [clinics, setClinics] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [filters, setFilters] = useState({
     clinic_id: '',
     startDate: '',
-    endDate: ''
+    endDate: '',
+    period: 'month'
   });
 
   useEffect(() => {
     fetchStats();
   }, [filters]);
+
+  useEffect(() => {
+    setRange('month');
+  }, []);
 
   const fetchStats = async () => {
     try {
@@ -44,17 +53,69 @@ export default function OwnerDashboard() {
 
   const setRange = (rangeType) => {
     const now = new Date();
-    let start = new Date();
-    if (rangeType === 'today') start.setHours(0,0,0,0);
-    if (rangeType === 'week') start.setDate(now.getDate() - 7);
-    if (rangeType === 'month') start.setMonth(now.getMonth() - 1);
+    let start = new Date(now);
+    let end = new Date(now);
+
+    if (rangeType === 'today') {
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (rangeType === 'week') {
+      start.setDate(now.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (rangeType === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (rangeType === 'custom') {
+      setFilters((prev) => ({ ...prev, period: 'custom' }));
+      return;
+    }
     
-    setFilters({
-      ...filters,
+    setFilters((prev) => ({
+      ...prev,
+      period: rangeType,
       startDate: start.toISOString().split('T')[0],
-      endDate: now.toISOString().split('T')[0]
-    });
+      endDate: end.toISOString().split('T')[0]
+    }));
   };
+
+  const handleExportPdf = async () => {
+    try {
+      setExporting(true);
+      const response = await api.get('/dashboard/export', {
+        params: filters,
+        responseType: 'blob'
+      });
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', `reporte-dashboard-${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Error exporting PDF report:', error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const reportByOffice = stats?.reports?.income_by_office || [];
+  const reportByCashier = stats?.reports?.income_by_receptionist || [];
+  const reportTimeline = stats?.reports?.timeline || [];
+
+  const officeMax = Math.max(...reportByOffice.map((item) => item.total_income), 1);
+  const cashierMax = Math.max(...reportByCashier.map((item) => item.total_income), 1);
+  const timelineMax = Math.max(...reportTimeline.map((item) => item.total_income), 1);
 
   if (!stats && loading) return <div className="p-8 text-slate-600 font-medium italic">Sincronizando tablero corporativo...</div>;
 
@@ -69,9 +130,27 @@ export default function OwnerDashboard() {
         {/* Global Filters Panel */}
         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 flex flex-wrap items-center gap-4">
           <div className="flex bg-white p-1 rounded border border-slate-200 shadow-sm">
-            <button onClick={() => setRange('today')} className="px-4 py-1.5 text-[11px] font-bold text-slate-600 rounded transition-all hover:text-slate-900 uppercase tracking-wider">Hoy</button>
-            <button onClick={() => setRange('week')} className="px-4 py-1.5 text-[11px] font-bold text-slate-600 rounded transition-all hover:text-slate-900 uppercase tracking-wider">Semana</button>
-            <button onClick={() => setRange('month')} className="px-4 py-1.5 text-[11px] font-bold text-slate-600 rounded transition-all hover:text-slate-900 uppercase tracking-wider">Mes</button>
+            <button onClick={() => setRange('today')} className={`px-4 py-1.5 text-[11px] font-bold rounded transition-all uppercase tracking-wider ${filters.period === 'today' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`}>Día</button>
+            <button onClick={() => setRange('week')} className={`px-4 py-1.5 text-[11px] font-bold rounded transition-all uppercase tracking-wider ${filters.period === 'week' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`}>Semana</button>
+            <button onClick={() => setRange('month')} className={`px-4 py-1.5 text-[11px] font-bold rounded transition-all uppercase tracking-wider ${filters.period === 'month' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`}>Mes</button>
+            <button onClick={() => setRange('custom')} className={`px-4 py-1.5 text-[11px] font-bold rounded transition-all uppercase tracking-wider ${filters.period === 'custom' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`}>Rango</button>
+          </div>
+
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded border border-slate-200 shadow-sm">
+            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="date"
+              className="text-[11px] font-bold text-slate-700 bg-transparent outline-none"
+              value={filters.startDate}
+              onChange={(e) => setFilters((prev) => ({ ...prev, period: 'custom', startDate: e.target.value }))}
+            />
+            <span className="text-slate-300">-</span>
+            <input
+              type="date"
+              className="text-[11px] font-bold text-slate-700 bg-transparent outline-none"
+              value={filters.endDate}
+              onChange={(e) => setFilters((prev) => ({ ...prev, period: 'custom', endDate: e.target.value }))}
+            />
           </div>
           
           <div className="h-4 w-px bg-slate-200 mx-1 hidden md:block"></div>
@@ -94,7 +173,32 @@ export default function OwnerDashboard() {
           >
             <RefreshCw className="h-4 w-4" />
           </button>
+
+          <button
+            onClick={handleExportPdf}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider disabled:opacity-60"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {exporting ? 'Exportando...' : 'Exportar PDF'}
+          </button>
         </div>
+      </div>
+
+      <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold text-amber-900">
+        {stats?.report_branding?.logo_url ? (
+          <img
+            src={stats.report_branding.logo_url}
+            alt="Logo del reporte"
+            className="h-10 w-auto max-w-28 object-contain rounded bg-white border border-amber-200 p-1"
+          />
+        ) : null}
+        <span className="uppercase tracking-wider">Reporte actual</span>
+        <span>Organización: {stats?.report_branding?.organization_name || 'N/A'}</span>
+        <span>Sucursal branding: {stats?.report_branding?.clinic_name || 'General'}</span>
+        <span>Rango: {filters.startDate || '---'} a {filters.endDate || '---'}</span>
+        <span>Ingresos registrados por recepcionistas: ${(stats?.reports?.summary?.total_income_receptionists || 0).toLocaleString()}</span>
+        <span>Movimientos de ingreso: {stats?.reports?.summary?.total_income_transactions || 0}</span>
       </div>
 
       {/* Financial Metrics Cards */}
@@ -142,6 +246,87 @@ export default function OwnerDashboard() {
           <div className="mt-8 pt-4 border-t border-white/10 flex items-center text-[11px] text-white/60 font-bold uppercase tracking-wide">
             <ArrowUpRight className="h-3 w-3 mr-2" />
             Rentabilidad Corporativa
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="bg-white p-7 rounded-lg border border-slate-200 shadow-sm lg:col-span-1">
+          <div className="flex items-center justify-between mb-6">
+            <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+              <Building className="h-4 w-4" />
+              Ingresos por consultorio
+            </h4>
+            <span className="text-[11px] font-bold text-slate-400 uppercase">Top</span>
+          </div>
+
+          <div className="space-y-4">
+            {reportByOffice.length === 0 && <p className="text-sm text-slate-500">Sin ingresos en este periodo.</p>}
+            {reportByOffice.slice(0, 6).map((item) => (
+              <div key={`${item.office_id}-${item.clinic_name}`}>
+                <div className="flex justify-between items-center text-xs mb-1">
+                  <p className="font-bold text-slate-700 truncate pr-2">{item.office_name}</p>
+                  <span className="font-bold text-slate-900">${item.total_income.toLocaleString()}</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mb-1 truncate">{item.clinic_name}</p>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-600" style={{ width: `${Math.max(6, (item.total_income / officeMax) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white p-7 rounded-lg border border-slate-200 shadow-sm lg:col-span-1">
+          <div className="flex items-center justify-between mb-6">
+            <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+              <UserCircle2 className="h-4 w-4" />
+              Quién cobró
+            </h4>
+            <span className="text-[11px] font-bold text-slate-400 uppercase">Recepción</span>
+          </div>
+
+          <div className="space-y-4">
+            {reportByCashier.length === 0 && <p className="text-sm text-slate-500">Sin cobros en este periodo.</p>}
+            {reportByCashier.slice(0, 6).map((item) => (
+              <div key={item.user_id}>
+                <div className="flex justify-between items-center text-xs mb-1">
+                  <p className="font-bold text-slate-700 truncate pr-2">{item.cashier_name}</p>
+                  <span className="font-bold text-slate-900">${item.total_income.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] mb-1">
+                  <span className="text-slate-400">{item.role === 'RECEPTIONIST' ? 'Recepcionista' : item.role}</span>
+                  <span className="text-slate-400">{item.transactions_count} cobros</span>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-600" style={{ width: `${Math.max(6, (item.total_income / cashierMax) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-slate-950 p-7 rounded-lg border border-slate-900 shadow-sm lg:col-span-1">
+          <div className="flex items-center justify-between mb-6">
+            <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <FileBarChart2 className="h-4 w-4" />
+              Tendencia de ingresos
+            </h4>
+            <span className="text-[11px] font-bold text-slate-400 uppercase">Diario</span>
+          </div>
+
+          <div className="flex items-end gap-2 h-44">
+            {reportTimeline.length === 0 && <p className="text-sm text-slate-400">Sin datos en el rango seleccionado.</p>}
+            {reportTimeline.slice(-12).map((item) => (
+              <div key={item.label} className="flex-1 min-w-0 flex flex-col items-center justify-end">
+                <div
+                  className="w-full max-w-8 bg-cyan-400 rounded-t"
+                  style={{ height: `${Math.max(8, (item.total_income / timelineMax) * 100)}%` }}
+                  title={`${item.label}: $${item.total_income.toLocaleString()}`}
+                />
+                <span className="text-[10px] text-slate-400 mt-2 truncate w-full text-center">{item.label.slice(5)}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
