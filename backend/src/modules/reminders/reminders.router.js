@@ -16,7 +16,15 @@ router.post("/:appointmentId/send-now", RemindersController.sendNow);
 router.get("/logs", RemindersController.getLogs);
 router.get("/config-status", RemindersController.getConfigStatus);
 router.post("/config", restrictTo("OWNER"), RemindersController.updateConfig);
-router.post("/test-message", restrictTo("OWNER"), RemindersController.sendTestMessage);
-router.post("/test-message/patients", restrictTo("OWNER"), RemindersController.sendTestToPatients);
+router.post(
+  "/test-message",
+  restrictTo("OWNER"),
+  RemindersController.sendTestMessage,
+);
+router.post(
+  "/test-message/patients",
+  restrictTo("OWNER"),
+  RemindersController.sendTestToPatients,
+);
 
 module.exports = router;

@@ -541,7 +541,8 @@ class RemindersService {
   }
 
   static async sendTestMessage(organizationId, userId, payload = {}) {
-    const orgConfig = await WhatsAppService.getOrganizationConfig(organizationId);
+    const orgConfig =
+      await WhatsAppService.getOrganizationConfig(organizationId);
 
     const result = await WhatsAppService.sendTestMessage({
       to: payload.to,
@@ -552,8 +553,8 @@ class RemindersService {
 
     await AuditLogService.log({
       userId: userId || null,
-      action: 'WHATSAPP_TEST_SENT',
-      targetModel: 'ORGANIZATION_WHATSAPP_CONFIG',
+      action: "WHATSAPP_TEST_SENT",
+      targetModel: "ORGANIZATION_WHATSAPP_CONFIG",
       targetId: organizationId,
       metadata: {
         to: result.to,
@@ -571,7 +572,8 @@ class RemindersService {
     userId,
     payload = {},
   ) {
-    const orgConfig = await WhatsAppService.getOrganizationConfig(organizationId);
+    const orgConfig =
+      await WhatsAppService.getOrganizationConfig(organizationId);
 
     const patients = await db.patient.findMany({
       where: {
@@ -586,7 +588,7 @@ class RemindersService {
         last_name: true,
         phone: true,
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: "desc" },
       take: Number(payload.limit || 100),
     });
 
@@ -601,7 +603,7 @@ class RemindersService {
 
     if (uniquePhones.size === 0) {
       throw new AppError(
-        'No hay pacientes con teléfono válido para prueba WhatsApp.',
+        "No hay pacientes con teléfono válido para prueba WhatsApp.",
         400,
       );
     }
@@ -624,7 +626,7 @@ class RemindersService {
           patient_id: patient.id,
           patient_name: `${patient.first_name} ${patient.last_name}`.trim(),
           to: result.to,
-          status: 'SENT',
+          status: "SENT",
           messageId: result.messageId,
         });
       } catch (error) {
@@ -633,7 +635,7 @@ class RemindersService {
           patient_id: patient.id,
           patient_name: `${patient.first_name} ${patient.last_name}`.trim(),
           to: phone,
-          status: 'FAILED',
+          status: "FAILED",
           error: error.message,
         });
       }
@@ -641,15 +643,15 @@ class RemindersService {
 
     await AuditLogService.log({
       userId: userId || null,
-      action: 'WHATSAPP_TEST_BULK_SENT',
-      targetModel: 'ORGANIZATION_WHATSAPP_CONFIG',
+      action: "WHATSAPP_TEST_BULK_SENT",
+      targetModel: "ORGANIZATION_WHATSAPP_CONFIG",
       targetId: organizationId,
       metadata: {
         totalCandidates: uniquePhones.size,
         sent,
         failed,
-        templateName: String(payload.templateName || 'hello_world'),
-        templateLang: String(payload.templateLang || 'en_US'),
+        templateName: String(payload.templateName || "hello_world"),
+        templateLang: String(payload.templateLang || "en_US"),
       },
     });
 

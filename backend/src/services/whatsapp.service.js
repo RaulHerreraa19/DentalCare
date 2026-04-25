@@ -3,7 +3,7 @@ const db = require("../config/database");
 
 class WhatsAppService {
   static normalizePhone(rawPhone) {
-    const digits = String(rawPhone || '').replace(/\D/g, '');
+    const digits = String(rawPhone || "").replace(/\D/g, "");
     if (!digits) return null;
     if (digits.length === 10) return `52${digits}`;
     return digits;
@@ -311,37 +311,37 @@ class WhatsAppService {
   static async sendTestMessage({
     to,
     organizationConfig = null,
-    templateName = 'hello_world',
-    templateLang = 'en_US',
+    templateName = "hello_world",
+    templateLang = "en_US",
   }) {
     const cfg = this.getConfig(organizationConfig);
     const normalizedTo = this.normalizePhone(to);
 
     if (!normalizedTo) {
-      throw new AppError('Número de destino inválido para WhatsApp.', 400);
+      throw new AppError("Número de destino inválido para WhatsApp.", 400);
     }
 
     if (!cfg.token || !cfg.phoneNumberId) {
-      throw new AppError('Configuración de WhatsApp incompleta.', 400);
+      throw new AppError("Configuración de WhatsApp incompleta.", 400);
     }
 
     const endpoint = `https://graph.facebook.com/${cfg.apiVersion}/${cfg.phoneNumberId}/messages`;
 
     const payload = {
-      messaging_product: 'whatsapp',
+      messaging_product: "whatsapp",
       to: normalizedTo,
-      type: 'template',
+      type: "template",
       template: {
-        name: String(templateName || 'hello_world'),
-        language: { code: String(templateLang || 'en_US') },
+        name: String(templateName || "hello_world"),
+        language: { code: String(templateLang || "en_US") },
       },
     };
 
     const response = await fetch(endpoint, {
-      method: 'POST',
+      method: "POST",
       headers: {
         Authorization: `Bearer ${cfg.token}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
     });
@@ -349,17 +349,19 @@ class WhatsAppService {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const errorMessage = data?.error?.message || 'Error al enviar mensaje de prueba por WhatsApp.';
+      const errorMessage =
+        data?.error?.message ||
+        "Error al enviar mensaje de prueba por WhatsApp.";
       throw new AppError(errorMessage, response.status || 500);
     }
 
     return {
       skipped: false,
       messageId: data?.messages?.[0]?.id || null,
-      reason: 'sent-test',
+      reason: "sent-test",
       to: normalizedTo,
-      templateName: String(templateName || 'hello_world'),
-      templateLang: String(templateLang || 'en_US'),
+      templateName: String(templateName || "hello_world"),
+      templateLang: String(templateLang || "en_US"),
     };
   }
 }

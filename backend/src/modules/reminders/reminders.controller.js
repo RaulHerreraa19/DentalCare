@@ -88,7 +88,7 @@ class RemindersController {
         req.body || {},
       );
 
-      return ApiResponse.success(res, 'Mensaje de prueba enviado', result);
+      return ApiResponse.success(res, "Mensaje de prueba enviado", result);
     } catch (error) {
       next(error);
     }
@@ -104,7 +104,7 @@ class RemindersController {
 
       return ApiResponse.success(
         res,
-        'Prueba enviada a pacientes registrados',
+        "Prueba enviada a pacientes registrados",
         result,
       );
     } catch (error) {
