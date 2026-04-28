@@ -1,10 +1,26 @@
-const db = require('../../config/database');
+const db = require("../../config/database");
 
 class AuditLogService {
   /**
    * Registra una acción en la bitácora de auditoría.
    */
-  static async log({ userId, action, targetModel, targetId, metadata }) {
+  static async log({
+    userId,
+    action,
+    targetModel,
+    targetId,
+    organizationId,
+    patientId,
+    resourceType,
+    resourceId,
+    accessGranted,
+    ipAddress,
+    userAgent,
+    beforeSnapshot,
+    afterSnapshot,
+    reason,
+    metadata,
+  }) {
     try {
       return await db.auditLog.create({
         data: {
@@ -12,12 +28,22 @@ class AuditLogService {
           action,
           target_model: targetModel,
           target_id: targetId,
-          metadata: metadata || {}
-        }
+          organization_id: organizationId,
+          patient_id: patientId,
+          resource_type: resourceType,
+          resource_id: resourceId,
+          access_granted: accessGranted,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          before_snapshot: beforeSnapshot,
+          after_snapshot: afterSnapshot,
+          reason,
+          metadata: metadata || {},
+        },
       });
     } catch (error) {
       // No bloqueamos la operación principal por fallas en logs, pero informamos
-      console.error('CRITICAL: Failed to write audit log', error);
+      console.error("CRITICAL: Failed to write audit log", error);
     }
   }
 
@@ -28,20 +54,20 @@ class AuditLogService {
     return await db.auditLog.findMany({
       where: {
         target_model: targetModel,
-        target_id: targetId
+        target_id: targetId,
       },
       include: {
         user: {
           select: {
             first_name: true,
             last_name: true,
-            role: true
-          }
-        }
+            role: true,
+          },
+        },
       },
       orderBy: {
-        created_at: 'desc'
-      }
+        created_at: "desc",
+      },
     });
   }
 }

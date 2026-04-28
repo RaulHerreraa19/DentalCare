@@ -23,6 +23,8 @@ import Patients from './pages/reception/Patients';
 import Calendar from './pages/reception/Calendar';
 import DoctorSchedule from './pages/doctor/Schedule';
 import { useAuth } from './context/AuthContext';
+import MedicalRecordWizard from './pages/doctor/MedicalRecordWizard';
+import MedicalRecordsFollowup from './pages/doctor/MedicalRecordsFollowup';
 
 function DashboardRedirect() {
   const { user } = useAuth();
@@ -95,6 +97,8 @@ function App() {
           <Route path="/doctor/schedule" element={<ProtectedRoute allowedRoles={['DOCTOR']}><DoctorSchedule /></ProtectedRoute>} />
           <Route path="/doctor/dashboard" element={<ProtectedRoute allowedRoles={['DOCTOR']}><DoctorDashboard /></ProtectedRoute>} />
           <Route path="/doctor/medical-records/:patientId" element={<ProtectedRoute allowedRoles={['DOCTOR']}><MedicalRecordEditor /></ProtectedRoute>} />
+            <Route path="/doctor/expedient/:patientId" element={<ProtectedRoute allowedRoles={['DOCTOR']}><MedicalRecordWizard /></ProtectedRoute>} />
+            <Route path="/doctor/followup" element={<ProtectedRoute allowedRoles={['DOCTOR']}><MedicalRecordsFollowup /></ProtectedRoute>} />
           <Route path="/doctor/profile" element={<ProtectedRoute allowedRoles={['DOCTOR', 'OWNER']}><ProfileSettings /></ProtectedRoute>} />
           
           <Route path="/reception/patients" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'OWNER', 'DOCTOR']}><Patients /></ProtectedRoute>} />

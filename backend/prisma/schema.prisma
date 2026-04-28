@@ -45,6 +45,7 @@ model Organization {
   users          User[]
   patients       Patient[]
   cash_registers CashRegister[]
+  consents       Consent[]
   whatsapp_config OrganizationWhatsAppConfig?
 
   @@map("organizations")
@@ -136,6 +137,11 @@ model User {
   services_offered  Service[]
   
   medical_records   MedicalRecord[] @relation("DoctorTreating")
+  medical_record_versions_created MedicalRecordVersion[]
+  medical_notes_authored MedicalNote[] @relation("MedicalNoteAuthor")
+  medical_note_versions_created MedicalNoteVersion[]
+  odontograms_created Odontogram[] @relation("OdontogramCreator")
+  consents_accepted  Consent[] @relation("ConsentAcceptedBy")
   doctor_schedules  DoctorSchedule[]
   cash_registered   CashRegister[]
   audit_logs        AuditLog[]
@@ -212,6 +218,7 @@ model Patient {
   appointments      Appointment[]
   medical_records   MedicalRecord[]
   prescriptions     Prescription[]
+  consents          Consent[]
 
   @@map("patients")
 }
@@ -310,11 +317,36 @@ enum NoteType {
   PRESCRIPTION
 }
 
+enum RecordStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum ConsentType {
+  DATA_PRIVACY
+  DENTAL_TREATMENT
+  WHATSAPP
+}
+
+enum ConsentSignatureType {
+  DRAWN
+  CLICK_WRAP
+  OTP
+  ELECTRONIC_SIGNATURE
+}
+
 model MedicalRecord {
   id                String       @id @default(uuid())
   patient_id        String
   doctor_id         String       // Médico tratante. Privacidad: solo él consulta este exp.
   organization_id   String?
+  status            RecordStatus @default(DRAFT)
+  current_version   Int          @default(1)
+  locked_at         DateTime?
+  signed_at         DateTime?
+  signature_hash    String?
   
   diagnosis               String?
   treatment_plan          String?
@@ -341,6 +373,7 @@ model MedicalRecord {
   patient           Patient      @relation(fields: [patient_id], references: [id])
   doctor            User         @relation("DoctorTreating", fields: [doctor_id], references: [id])
   
+  versions          MedicalRecordVersion[]
   notes             MedicalNote[]
   odontograms       Odontogram[]
 
@@ -348,35 +381,116 @@ model MedicalRecord {
   @@map("medical_records")
 }
 
+model MedicalRecordVersion {
+  id                String       @id @default(uuid())
+  medical_record_id  String
+  version_number     Int
+  created_by         String
+  change_reason      String?
+  sections           Json
+  is_locked          Boolean      @default(false)
+  signed_at          DateTime?
+  signature_hash     String?
+  created_at         DateTime     @default(now())
+
+  medical_record     MedicalRecord @relation(fields: [medical_record_id], references: [id])
+  creator            User          @relation(fields: [created_by], references: [id])
+
+  @@unique([medical_record_id, version_number])
+  @@map("medical_record_versions")
+}
+
 model MedicalNote {
   id                String        @id @default(uuid())
   medical_record_id String
   appointment_id    String?
+  author_id         String
+  version           Int           @default(1)
   content           String
   note_type         NoteType      @default(CONSULTATION)
   attachments       Json?         // Rutas a imagenes/archivos
   is_signed         Boolean       @default(false)
   signed_at         DateTime?
   signature_hash    String?       // SHA-256
+  locked_at         DateTime?
   created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
 
   medical_record    MedicalRecord @relation(fields: [medical_record_id], references: [id])
   appointment       Appointment?  @relation(fields: [appointment_id], references: [id])
+  author            User          @relation("MedicalNoteAuthor", fields: [author_id], references: [id])
+  versions          MedicalNoteVersion[]
 
   @@map("medical_notes")
+}
+
+model MedicalNoteVersion {
+  id                String        @id @default(uuid())
+  medical_note_id   String
+  version_number    Int
+  created_by        String
+  content           String
+  note_type         NoteType      @default(CONSULTATION)
+  attachments       Json?
+  is_signed         Boolean       @default(false)
+  signed_at         DateTime?
+  signature_hash    String?
+  change_reason     String?
+  created_at        DateTime      @default(now())
+
+  medical_note      MedicalNote   @relation(fields: [medical_note_id], references: [id])
+  creator           User          @relation(fields: [created_by], references: [id])
+
+  @@unique([medical_note_id, version_number])
+  @@map("medical_note_versions")
 }
 
 model Odontogram {
   id                String        @id @default(uuid())
   medical_record_id String
+  created_by        String
   tooth_data        Json          // { toothNumber: { status: "CARIES", surfaces: ["M", "O"], notes: "..." } }
   version           Int           @default(1)
+  status            RecordStatus  @default(DRAFT)
+  is_locked         Boolean       @default(false)
+  signed_at         DateTime?
+  signature_hash    String?
   created_at        DateTime      @default(now())
   updated_at        DateTime      @updatedAt
 
   medical_record    MedicalRecord @relation(fields: [medical_record_id], references: [id])
+  creator           User          @relation("OdontogramCreator", fields: [created_by], references: [id])
 
   @@map("odontograms")
+}
+
+model Consent {
+  id                String                @id @default(uuid())
+  organization_id   String
+  patient_id        String
+  consent_type      ConsentType
+  title             String
+  content           String                @db.Text
+  version           Int                   @default(1)
+  language          String                @default("es_MX")
+  accepted          Boolean               @default(false)
+  accepted_at       DateTime?
+  accepted_by       String?
+  signature_type    ConsentSignatureType?
+  document_hash     String?
+  ip_address        String?
+  user_agent        String?
+  revoked_at        DateTime?
+  revoked_reason    String?
+  created_at        DateTime              @default(now())
+  updated_at        DateTime              @updatedAt
+
+  organization      Organization          @relation(fields: [organization_id], references: [id])
+  patient           Patient               @relation(fields: [patient_id], references: [id])
+  accepted_by_user  User?                 @relation("ConsentAcceptedBy", fields: [accepted_by], references: [id])
+
+  @@unique([patient_id, consent_type, version])
+  @@map("consents")
 }
 
 // ----------------------------------------------------------------------
@@ -444,6 +558,16 @@ model AuditLog {
   action          String   // CREATE, SIGN, UPDATE, DELETE, VIEW
   target_model    String?  // MEDICAL_RECORD, PATIENT, etc.
   target_id       String?
+  organization_id String?
+  patient_id      String?
+  resource_type   String?
+  resource_id     String?
+  access_granted  Boolean?
+  ip_address      String?
+  user_agent      String?
+  before_snapshot Json?
+  after_snapshot  Json?
+  reason          String?
   metadata        Json?    // { ip: "...", old_value: "...", new_value: "..." }
   created_at      DateTime @default(now())
 

@@ -1,0 +1,1154 @@
+const crypto = require("crypto");
+const db = require("../../config/database");
+const AppError = require("../../utils/AppError");
+const { generateDigitalSeal } = require("../../utils/crypto");
+const AuditLogService = require("../audit/audit.service");
+
+const NOTE_LIMIT = 20;
+const VERSION_LIMIT = 20;
+
+const textOrNull = (value) => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
+  return JSON.stringify(value);
+};
+
+const jsonSafe = (value) => {
+  if (value === undefined) return null;
+  if (value === null) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map((item) => jsonSafe(item));
+  if (typeof value === "object") {
+    const normalized = {};
+    Object.entries(value).forEach(([key, nestedValue]) => {
+      normalized[key] = jsonSafe(nestedValue);
+    });
+    return normalized;
+  }
+  return value;
+};
+
+const safeDate = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+const hashDocument = (payload) => {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(payload))
+    .digest("hex");
+};
+
+const mergeClinicalNotes = (record, data) => {
+  const existing =
+    record?.clinical_notes && typeof record.clinical_notes === "object"
+      ? record.clinical_notes
+      : {};
+  return {
+    ...existing,
+    chief_complaint: data.chief_complaint ?? existing.chief_complaint ?? null,
+    symptoms_start_date:
+      safeDate(data.symptoms_start_date) ??
+      existing.symptoms_start_date ??
+      null,
+    pain_presence: data.pain_presence ?? existing.pain_presence ?? null,
+    pain_intensity: data.pain_intensity ?? existing.pain_intensity ?? null,
+    pain_character:
+      textOrNull(data.pain_character) ?? existing.pain_character ?? null,
+    pain_location:
+      textOrNull(data.pain_location) ?? existing.pain_location ?? null,
+    pain_triggers:
+      textOrNull(data.pain_triggers) ?? existing.pain_triggers ?? null,
+    pain_relief: textOrNull(data.pain_relief) ?? existing.pain_relief ?? null,
+    review_of_systems:
+      textOrNull(data.review_of_systems) ?? existing.review_of_systems ?? null,
+    extraoral_exam:
+      textOrNull(data.extraoral_exam) ?? existing.extraoral_exam ?? null,
+    intraoral_exam:
+      textOrNull(data.intraoral_exam) ?? existing.intraoral_exam ?? null,
+    periodontal_status:
+      textOrNull(data.periodontal_status) ??
+      existing.periodontal_status ??
+      null,
+    radiographic_findings:
+      textOrNull(data.radiographic_findings) ??
+      existing.radiographic_findings ??
+      null,
+    diagnostic_basis:
+      textOrNull(data.diagnostic_basis) ?? existing.diagnostic_basis ?? null,
+    treatment_objective:
+      textOrNull(data.treatment_objective) ??
+      existing.treatment_objective ??
+      null,
+    risks_explained:
+      textOrNull(data.risks_explained) ?? existing.risks_explained ?? null,
+    alternatives_explained:
+      textOrNull(data.alternatives_explained) ??
+      existing.alternatives_explained ??
+      null,
+    follow_up_plan:
+      textOrNull(data.follow_up_plan) ?? existing.follow_up_plan ?? null,
+    note_summary:
+      textOrNull(data.note_summary) ?? existing.note_summary ?? null,
+  };
+};
+
+const buildSections = ({
+  patient,
+  doctor,
+  record,
+  latestOdontogram,
+  latestNote,
+  data,
+}) => {
+  const currentInterview =
+    record?.clinical_notes && typeof record.clinical_notes === "object"
+      ? record.clinical_notes
+      : {};
+  const currentMedications =
+    record?.medications && typeof record.medications === "object"
+      ? record.medications
+      : null;
+
+  return {
+    identification: {
+      patient_id: patient.id,
+      organization_id: patient.organization_id,
+      full_name: `${patient.first_name} ${patient.last_name}`.trim(),
+      first_name: patient.first_name,
+      last_name: patient.last_name,
+      date_of_birth: safeDate(patient.date_of_birth),
+      gender: patient.gender ?? null,
+      email: patient.email ?? null,
+      phone: patient.phone ?? null,
+      address: patient.address ?? null,
+      emergency_contact: patient.emergency_contact ?? null,
+      doctor_id: doctor.id,
+      doctor_name: `${doctor.first_name} ${doctor.last_name}`.trim(),
+      doctor_license_number: doctor.license_number ?? null,
+      doctor_specialty: doctor.specialty ?? null,
+    },
+    history: {
+      family_history:
+        textOrNull(data.family_history) ?? textOrNull(record?.family_history),
+      pathological_history:
+        textOrNull(data.pathological_history) ??
+        textOrNull(record?.pathological_history),
+      non_pathological_history:
+        textOrNull(data.non_pathological_history) ??
+        textOrNull(record?.non_pathological_history),
+      allergies: textOrNull(data.allergies) ?? textOrNull(record?.allergies),
+      surgeries: textOrNull(data.surgeries) ?? textOrNull(record?.surgeries),
+      current_medications:
+        textOrNull(data.current_medications) ??
+        textOrNull(record?.current_medications),
+      dental_history:
+        textOrNull(data.dental_history) ?? textOrNull(record?.dental_history),
+      brushing_frequency:
+        textOrNull(data.brushing_frequency) ??
+        textOrNull(record?.brushing_frequency),
+      use_floss: data.use_floss ?? record?.use_floss ?? false,
+    },
+    interview: {
+      chief_complaint:
+        textOrNull(data.chief_complaint) ??
+        currentInterview.chief_complaint ??
+        null,
+      symptoms_start_date:
+        safeDate(data.symptoms_start_date) ??
+        currentInterview.symptoms_start_date ??
+        null,
+      pain_presence:
+        data.pain_presence ?? currentInterview.pain_presence ?? null,
+      pain_intensity:
+        data.pain_intensity ?? currentInterview.pain_intensity ?? null,
+      pain_character:
+        textOrNull(data.pain_character) ??
+        currentInterview.pain_character ??
+        null,
+      pain_location:
+        textOrNull(data.pain_location) ??
+        currentInterview.pain_location ??
+        null,
+      pain_triggers:
+        textOrNull(data.pain_triggers) ??
+        currentInterview.pain_triggers ??
+        null,
+      pain_relief:
+        textOrNull(data.pain_relief) ?? currentInterview.pain_relief ?? null,
+      review_of_systems:
+        textOrNull(data.review_of_systems) ??
+        currentInterview.review_of_systems ??
+        null,
+    },
+    exploration: {
+      extraoral_exam:
+        textOrNull(data.extraoral_exam) ??
+        currentInterview.extraoral_exam ??
+        null,
+      intraoral_exam:
+        textOrNull(data.intraoral_exam) ??
+        currentInterview.intraoral_exam ??
+        null,
+      periodontal_status:
+        textOrNull(data.periodontal_status) ??
+        currentInterview.periodontal_status ??
+        null,
+      radiographic_findings:
+        textOrNull(data.radiographic_findings) ??
+        currentInterview.radiographic_findings ??
+        null,
+    },
+    diagnosis: {
+      primary_diagnosis:
+        textOrNull(data.primary_diagnosis) ??
+        textOrNull(data.diagnosis) ??
+        textOrNull(record?.diagnosis),
+      secondary_diagnoses: jsonSafe(
+        data.secondary_diagnoses ?? data.secondary_diagnosis ?? null,
+      ),
+      icd10_code: textOrNull(data.icd10_code) ?? null,
+      diagnostic_basis:
+        textOrNull(data.diagnostic_basis) ??
+        currentInterview.diagnostic_basis ??
+        null,
+    },
+    plan: {
+      treatment_objective: textOrNull(data.treatment_objective) ?? null,
+      proposed_procedures: jsonSafe(data.proposed_procedures ?? null),
+      treatment_plan:
+        textOrNull(data.treatment_plan) ?? textOrNull(record?.treatment_plan),
+      risks_explained:
+        textOrNull(data.risks_explained) ??
+        currentInterview.risks_explained ??
+        null,
+      alternatives_explained:
+        textOrNull(data.alternatives_explained) ??
+        currentInterview.alternatives_explained ??
+        null,
+      follow_up_plan:
+        textOrNull(data.follow_up_plan) ??
+        currentInterview.follow_up_plan ??
+        null,
+      estimated_cost: data.estimated_cost ?? null,
+      medications: jsonSafe(data.medications ?? currentMedications ?? null),
+    },
+    evolution: {
+      latest_note_id: latestNote?.id ?? null,
+      latest_note_type: latestNote?.note_type ?? null,
+      latest_note_content: latestNote?.content ?? null,
+      latest_note_signed_at: latestNote?.signed_at
+        ? latestNote.signed_at.toISOString()
+        : null,
+      appointment_id: latestNote?.appointment_id ?? null,
+    },
+    odontogram: {
+      version: latestOdontogram?.version ?? null,
+      tooth_data: jsonSafe(
+        data.tooth_data ??
+          data.odontogram ??
+          latestOdontogram?.tooth_data ??
+          null,
+      ),
+    },
+  };
+};
+
+const buildLegacyUpdateData = (record, data) => {
+  const nextStatus =
+    data.close_record || data.status === "CLOSED"
+      ? "CLOSED"
+      : record.status || "ACTIVE";
+  const nextLockedAt =
+    data.close_record || data.status === "CLOSED"
+      ? new Date()
+      : (record.locked_at ?? null);
+
+  const updateData = {
+    diagnosis:
+      textOrNull(data.diagnosis) ??
+      textOrNull(data.primary_diagnosis) ??
+      textOrNull(record.diagnosis),
+    treatment_plan:
+      textOrNull(data.treatment_plan) ?? textOrNull(record.treatment_plan),
+    family_history:
+      textOrNull(data.family_history) ?? textOrNull(record.family_history),
+    pathological_history:
+      textOrNull(data.pathological_history) ??
+      textOrNull(record.pathological_history),
+    non_pathological_history:
+      textOrNull(data.non_pathological_history) ??
+      textOrNull(record.non_pathological_history),
+    allergies: textOrNull(data.allergies) ?? textOrNull(record.allergies),
+    surgeries: textOrNull(data.surgeries) ?? textOrNull(record.surgeries),
+    current_medications:
+      textOrNull(data.current_medications) ??
+      textOrNull(record.current_medications),
+    dental_history:
+      textOrNull(data.dental_history) ?? textOrNull(record.dental_history),
+    brushing_frequency:
+      textOrNull(data.brushing_frequency) ??
+      textOrNull(record.brushing_frequency),
+    use_floss:
+      typeof data.use_floss === "boolean"
+        ? data.use_floss
+        : (record.use_floss ?? false),
+    clinical_notes: mergeClinicalNotes(record, data),
+    medications: jsonSafe(data.medications ?? record.medications ?? null),
+    status: nextStatus,
+    locked_at: nextLockedAt,
+    current_version: (record.current_version || 1) + 1,
+  };
+
+  if (data.close_record || data.status === "CLOSED") {
+    updateData.locked_at = nextLockedAt;
+  }
+
+  return updateData;
+};
+
+const loadRecordContext = async (doctorId, patientId) => {
+  const [doctor, patient] = await Promise.all([
+    db.user.findUnique({ where: { id: doctorId } }),
+    db.patient.findUnique({ where: { id: patientId } }),
+  ]);
+
+  if (!doctor) throw new AppError("Médico no encontrado", 404);
+  if (!patient) throw new AppError("Paciente no encontrado", 404);
+  if (
+    doctor.organization_id &&
+    patient.organization_id !== doctor.organization_id
+  ) {
+    throw new AppError("No tienes acceso a este expediente clínico.", 403);
+  }
+
+  let record = await db.medicalRecord.findUnique({
+    where: {
+      patient_id_doctor_id: {
+        patient_id: patientId,
+        doctor_id: doctorId,
+      },
+    },
+  });
+
+  let created = false;
+  if (!record) {
+    record = await db.medicalRecord.create({
+      data: {
+        patient_id: patientId,
+        doctor_id: doctorId,
+        organization_id: patient.organization_id,
+        status: "DRAFT",
+        current_version: 1,
+      },
+    });
+    created = true;
+  }
+
+  return { doctor, patient, record, created };
+};
+
+const loadRecordBundle = async (recordId, patientId) => {
+  const [latestVersion, notes, latestOdontogram, consents] = await Promise.all([
+    db.medicalRecordVersion.findFirst({
+      where: { medical_record_id: recordId },
+      orderBy: { version_number: "desc" },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            role: true,
+            license_number: true,
+            specialty: true,
+          },
+        },
+      },
+    }),
+    db.medicalNote.findMany({
+      where: { medical_record_id: recordId },
+      orderBy: { created_at: "desc" },
+      take: NOTE_LIMIT,
+      include: {
+        author: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            role: true,
+            license_number: true,
+            specialty: true,
+          },
+        },
+      },
+    }),
+    db.odontogram.findFirst({
+      where: { medical_record_id: recordId },
+      orderBy: { version: "desc" },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            role: true,
+            license_number: true,
+            specialty: true,
+          },
+        },
+      },
+    }),
+    db.consent.findMany({
+      where: { patient_id: patientId },
+      orderBy: { version: "desc" },
+      include: {
+        accepted_by_user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            role: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  return { latestVersion, notes, latestOdontogram, consents };
+};
+
+const writeRecordVersion = async ({
+  recordId,
+  doctorId,
+  patient,
+  doctor,
+  record,
+  data,
+  reason,
+  latestOdontogram,
+  latestNote,
+}) => {
+  const sections = buildSections({
+    patient,
+    doctor,
+    record,
+    latestOdontogram,
+    latestNote,
+    data,
+  });
+  const legacyData = buildLegacyUpdateData(record, data);
+  const shouldCloseRecord = data.close_record || data.status === "CLOSED";
+  const signatureTimestamp = new Date().toISOString();
+  let versionSignature = null;
+
+  if (shouldCloseRecord && doctor.license_number) {
+    versionSignature = generateDigitalSeal({
+      patientId: patient.id,
+      doctorId,
+      content: JSON.stringify(sections),
+      timestamp: signatureTimestamp,
+      licenseNumber: doctor.license_number,
+    });
+  }
+
+  const odontogramPayload = data.tooth_data ?? data.odontogram ?? null;
+  const latestOdontogramVersion = latestOdontogram?.version || 0;
+  let createdOdontogram = null;
+
+  return db.$transaction(async (transaction) => {
+    const updatedRecord = await transaction.medicalRecord.update({
+      where: { id: recordId },
+      data: {
+        ...legacyData,
+        status: shouldCloseRecord
+          ? "CLOSED"
+          : record.status === "CLOSED"
+            ? "CLOSED"
+            : "ACTIVE",
+        locked_at: shouldCloseRecord ? new Date() : record.locked_at,
+        signed_at: shouldCloseRecord ? new Date() : record.signed_at,
+        signature_hash: shouldCloseRecord
+          ? (versionSignature ?? record.signature_hash)
+          : record.signature_hash,
+      },
+    });
+
+    const createdVersion = await transaction.medicalRecordVersion.create({
+      data: {
+        medical_record_id: recordId,
+        version_number: legacyData.current_version,
+        created_by: doctorId,
+        change_reason:
+          textOrNull(reason) ??
+          (shouldCloseRecord
+            ? "Cierre de expediente"
+            : "Actualización clínica"),
+        sections: sections,
+        is_locked: shouldCloseRecord,
+        signed_at: shouldCloseRecord ? new Date() : null,
+        signature_hash: shouldCloseRecord ? versionSignature : null,
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            role: true,
+            license_number: true,
+            specialty: true,
+          },
+        },
+      },
+    });
+
+  static async listConsents(doctorId, patientId) {
+    const { patient } = await loadRecordContext(doctorId, patientId);
+    return db.consent.findMany({
+      where: { patient_id: patient.id },
+      orderBy: [{ consent_type: "asc" }, { version: "desc" }],
+      include: {
+        accepted_by_user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            role: true,
+          },
+        },
+      },
+    });
+  }
+
+  static async getAllRecordsByDoctor(doctorId) {
+    return db.medicalRecord.findMany({
+      where: { doctor_id: doctorId },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            phone: true,
+            date_of_birth: true,
+          },
+        },
+        doctor: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            license_number: true,
+          },
+        },
+      },
+      orderBy: { updated_at: "desc" },
+    });
+  }
+      targetModel: "MEDICAL_RECORD",
+      targetId: recordId,
+      organizationId: patient.organization_id,
+      patientId: patient.id,
+      resourceType: "medical_record",
+      resourceId: recordId,
+      accessGranted: true,
+      ipAddress: null,
+      userAgent: null,
+      beforeSnapshot: null,
+      afterSnapshot: {
+        version: createdVersion.version_number,
+        status: updatedRecord.status,
+        sections: sections,
+        odontogram_created: !!createdOdontogram,
+      },
+      reason: textOrNull(reason),
+      metadata: {
+        version: createdVersion.version_number,
+        close_record: shouldCloseRecord,
+      },
+    });
+
+    return { updatedRecord, createdVersion, createdOdontogram };
+  });
+};
+
+class MedicalRecordsService {
+  /**
+   * Obtiene o inicializa el expediente para un binomio específico de médico-paciente.
+   */
+  static async getOrCreateRecord(doctorId, patientId, options = {}) {
+    const { doctor, patient, record, created } = await loadRecordContext(
+      doctorId,
+      patientId,
+    );
+    let bundle = await loadRecordBundle(record.id, patient.id);
+
+    if (created || !bundle.latestVersion) {
+      const initialSections = buildSections({
+        patient,
+        doctor,
+        record,
+        latestOdontogram: bundle.latestOdontogram,
+        latestNote: bundle.notes[0] || null,
+        data: {},
+      });
+
+      await db.medicalRecordVersion.create({
+        data: {
+          medical_record_id: record.id,
+          version_number: bundle.latestVersion?.version_number || 1,
+          created_by: doctorId,
+          change_reason: created
+            ? "Creación inicial del expediente"
+            : "Migración inicial de expediente existente",
+          sections: initialSections,
+          is_locked: false,
+        },
+      });
+
+      await AuditLogService.log({
+        userId: doctorId,
+        action: "CREATE",
+        targetModel: "MEDICAL_RECORD",
+        targetId: record.id,
+        organizationId: patient.organization_id,
+        patientId: patient.id,
+        resourceType: "medical_record",
+        resourceId: record.id,
+        accessGranted: true,
+        ipAddress: options.ipAddress || null,
+        userAgent: options.userAgent || null,
+        afterSnapshot: initialSections,
+        metadata: { created: true, migrated: !created },
+      });
+
+      bundle = await loadRecordBundle(record.id, patient.id);
+    }
+
+    if (options.audit !== false) {
+      await AuditLogService.log({
+        userId: doctorId,
+        action: "VIEW",
+        targetModel: "MEDICAL_RECORD",
+        targetId: record.id,
+        organizationId: patient.organization_id,
+        patientId: patient.id,
+        resourceType: "medical_record",
+        resourceId: record.id,
+        accessGranted: true,
+        ipAddress: options.ipAddress || null,
+        userAgent: options.userAgent || null,
+        metadata: { source: "medical_record_view" },
+      });
+    }
+
+    return this.serializeRecord(record, bundle, { patient, doctor });
+  }
+
+  static serializeRecord(record, bundle, context = {}) {
+    const { latestVersion, notes, latestOdontogram, consents } = bundle;
+    const { patient, doctor } = context;
+    const sections =
+      latestVersion?.sections ||
+      buildSections({
+        patient,
+        doctor,
+        record,
+        latestOdontogram,
+        latestNote: notes[0] || null,
+        data: {},
+      });
+
+    return {
+      ...record,
+      sections,
+      latest_version: latestVersion,
+      notes,
+      odontogram: latestOdontogram,
+      consents,
+      history: {
+        versions: [latestVersion].filter(Boolean),
+        notes,
+        odontograms: latestOdontogram ? [latestOdontogram] : [],
+        consents,
+      },
+    };
+  }
+
+  static async getHistory(doctorId, patientId) {
+    const { doctor, patient, record } = await loadRecordContext(
+      doctorId,
+      patientId,
+    );
+    const [versions, noteVersions, odontograms, consents, auditLogs] =
+      await Promise.all([
+        db.medicalRecordVersion.findMany({
+          where: { medical_record_id: record.id },
+          orderBy: { version_number: "desc" },
+          take: VERSION_LIMIT,
+          include: {
+            creator: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                role: true,
+                license_number: true,
+                specialty: true,
+              },
+            },
+          },
+        }),
+        db.medicalNoteVersion.findMany({
+          where: { medical_note: { medical_record_id: record.id } },
+          orderBy: { created_at: "desc" },
+          take: VERSION_LIMIT,
+          include: {
+            creator: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                role: true,
+                license_number: true,
+                specialty: true,
+              },
+            },
+          },
+        }),
+        db.odontogram.findMany({
+          where: { medical_record_id: record.id },
+          orderBy: { version: "desc" },
+          take: VERSION_LIMIT,
+          include: {
+            creator: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                role: true,
+                license_number: true,
+                specialty: true,
+              },
+            },
+          },
+        }),
+        db.consent.findMany({
+          where: { patient_id: patient.id },
+          orderBy: { version: "desc" },
+        }),
+        db.auditLog.findMany({
+          where: {
+            patient_id: patient.id,
+            organization_id: patient.organization_id,
+          },
+          orderBy: { created_at: "desc" },
+          take: 100,
+          include: {
+            user: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                role: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+    return {
+      patient,
+      doctor,
+      record,
+      versions,
+      note_versions: noteVersions,
+      odontograms,
+      consents,
+      audit_logs: auditLogs,
+    };
+  }
+
+  /**
+   * Firma digitalmente una nota médica.
+   * Una vez firmada, la nota es inmutable.
+   */
+  static async signNote(doctorId, noteId, ipAddress, userAgent) {
+    const doctor = await db.user.findUnique({ where: { id: doctorId } });
+    if (!doctor || !doctor.license_number) {
+      throw new AppError(
+        "El médico debe configurar su cédula profesional en su perfil para firmar.",
+        400,
+      );
+    }
+
+    const note = await db.medicalNote.findUnique({
+      where: { id: noteId },
+      include: { medical_record: true },
+    });
+
+    if (!note) throw new AppError("Nota no encontrada", 404);
+    if (note.is_signed)
+      throw new AppError("Esta nota ya ha sido firmada.", 400);
+
+    if (
+      doctor.organization_id &&
+      note.medical_record.organization_id &&
+      doctor.organization_id !== note.medical_record.organization_id
+    ) {
+      throw new AppError("No tienes acceso a esta nota clínica.", 403);
+    }
+
+    const signatureTimestamp = new Date().toISOString();
+    const signatureHash = generateDigitalSeal({
+      patientId: note.medical_record.patient_id,
+      doctorId,
+      content: note.content,
+      timestamp: signatureTimestamp,
+      licenseNumber: doctor.license_number,
+    });
+
+    const signedNote = await db.$transaction(async (transaction) => {
+      const currentVersion = note.version || 1;
+      const existingVersion = await transaction.medicalNoteVersion.findFirst({
+        where: {
+          medical_note_id: note.id,
+          version_number: currentVersion,
+        },
+      });
+
+      if (existingVersion) {
+        await transaction.medicalNoteVersion.update({
+          where: { id: existingVersion.id },
+          data: {
+            is_signed: true,
+            signed_at: new Date(),
+            signature_hash: signatureHash,
+          },
+        });
+      } else {
+        await transaction.medicalNoteVersion.create({
+          data: {
+            medical_note_id: note.id,
+            version_number: currentVersion,
+            created_by: doctorId,
+            content: note.content,
+            note_type: note.note_type,
+            attachments: note.attachments,
+            is_signed: true,
+            signed_at: new Date(),
+            signature_hash: signatureHash,
+          },
+        });
+      }
+
+      return transaction.medicalNote.update({
+        where: { id: noteId },
+        data: {
+          is_signed: true,
+          signed_at: new Date(),
+          signature_hash: signatureHash,
+          locked_at: new Date(),
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              role: true,
+              license_number: true,
+              specialty: true,
+            },
+          },
+        },
+      });
+    });
+
+    await AuditLogService.log({
+      userId: doctorId,
+      action: "SIGN",
+      targetModel: "MEDICAL_NOTE",
+      targetId: noteId,
+      organizationId: note.medical_record.organization_id,
+      patientId: note.medical_record.patient_id,
+      resourceType: "medical_note",
+      resourceId: noteId,
+      accessGranted: true,
+      ipAddress,
+      userAgent,
+      afterSnapshot: {
+        is_signed: true,
+        signed_at: signedNote.signed_at,
+        signature_hash: signatureHash,
+      },
+      metadata: { hash: signatureHash },
+    });
+
+    return signedNote;
+  }
+
+  static async updateRecord(doctorId, patientId, data, ipAddress, userAgent) {
+    const { doctor, patient, record } = await loadRecordContext(
+      doctorId,
+      patientId,
+    );
+
+    if (record.status === "CLOSED" || record.locked_at) {
+      throw new AppError(
+        "El expediente ya fue cerrado y no puede modificarse. Crea un addendum si necesitas corregirlo.",
+        409,
+      );
+    }
+
+    const bundle = await loadRecordBundle(record.id, patient.id);
+    const latestOdontogram = bundle.latestOdontogram;
+    const latestNote = bundle.notes[0] || null;
+
+    const { updatedRecord, createdVersion, createdOdontogram } =
+      await writeRecordVersion({
+        recordId: record.id,
+        doctorId,
+        patient,
+        doctor,
+        record,
+        data,
+        reason: data.change_reason || data.reason || "Actualización clínica",
+        latestOdontogram,
+        latestNote,
+      });
+
+    await AuditLogService.log({
+      userId: doctorId,
+      action: "UPDATE",
+      targetModel: "MEDICAL_RECORD",
+      targetId: record.id,
+      organizationId: patient.organization_id,
+      patientId: patient.id,
+      resourceType: "medical_record",
+      resourceId: record.id,
+      accessGranted: true,
+      ipAddress,
+      userAgent,
+      beforeSnapshot: jsonSafe(record),
+      afterSnapshot: {
+        current_version: updatedRecord.current_version,
+        status: updatedRecord.status,
+        created_version: createdVersion.version_number,
+        odontogram_created: !!createdOdontogram,
+      },
+      reason: data.change_reason || data.reason || "Actualización clínica",
+      metadata: {
+        version: createdVersion.version_number,
+        closed: updatedRecord.status === "CLOSED",
+      },
+    });
+
+    const refreshed = await loadRecordBundle(record.id);
+    return this.serializeRecord(updatedRecord, refreshed, { patient, doctor });
+  }
+
+  /**
+   * Las notas de evolución se crean vinculadas a una cita y al expediente.
+   */
+  static async addProgressNote(
+    doctorId,
+    patientId,
+    data,
+    ipAddress,
+    userAgent,
+  ) {
+    const { doctor, patient, record } = await loadRecordContext(
+      doctorId,
+      patientId,
+    );
+    const content = textOrNull(data.content);
+
+    if (!content) {
+      throw new AppError("El contenido de la nota es obligatorio.", 400);
+    }
+
+    const note = await db.$transaction(async (transaction) => {
+      const createdNote = await transaction.medicalNote.create({
+        data: {
+          medical_record_id: record.id,
+          appointment_id: data.appointment_id || null,
+          author_id: doctorId,
+          content,
+          note_type: data.note_type || "CONSULTATION",
+          attachments: jsonSafe(data.attachments ?? null),
+          version: 1,
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              role: true,
+              license_number: true,
+              specialty: true,
+            },
+          },
+        },
+      });
+
+      await transaction.medicalNoteVersion.create({
+        data: {
+          medical_note_id: createdNote.id,
+          version_number: 1,
+          created_by: doctorId,
+          content,
+          note_type: createdNote.note_type,
+          attachments: createdNote.attachments,
+          is_signed: false,
+        },
+      });
+
+      return createdNote;
+    });
+
+    await AuditLogService.log({
+      userId: doctorId,
+      action: "CREATE",
+      targetModel: "MEDICAL_NOTE",
+      targetId: note.id,
+      organizationId: patient.organization_id,
+      patientId: patient.id,
+      resourceType: "medical_note",
+      resourceId: note.id,
+      accessGranted: true,
+      ipAddress,
+      userAgent,
+      afterSnapshot: {
+        content: note.content,
+        note_type: note.note_type,
+        appointment_id: note.appointment_id,
+      },
+      metadata: { appointment_id: note.appointment_id || null },
+    });
+
+    return note;
+  }
+
+  static async upsertConsent(doctorId, patientId, data, ipAddress, userAgent) {
+    const { doctor, patient } = await loadRecordContext(doctorId, patientId);
+    const consentType = data.consent_type;
+    const title = textOrNull(data.title);
+    const content = textOrNull(data.content);
+
+    if (!consentType) {
+      throw new AppError("El tipo de consentimiento es obligatorio.", 400);
+    }
+    if (!title || !content) {
+      throw new AppError(
+        "El título y el contenido del consentimiento son obligatorios.",
+        400,
+      );
+    }
+
+    const latestConsent = await db.consent.findFirst({
+      where: {
+        patient_id: patient.id,
+        consent_type: consentType,
+      },
+      orderBy: { version: "desc" },
+    });
+
+    const nextVersion = (latestConsent?.version || 0) + 1;
+    const accepted =
+      data.accepted !== undefined ? Boolean(data.accepted) : true;
+    const acceptedAt = accepted ? new Date() : null;
+    const signatureType =
+      data.signature_type || (accepted ? "CLICK_WRAP" : null);
+    const documentHash = hashDocument({
+      patientId: patient.id,
+      consentType,
+      title,
+      content,
+      nextVersion,
+    });
+
+    const consent = await db.consent.create({
+      data: {
+        organization_id: patient.organization_id,
+        patient_id: patient.id,
+        consent_type: consentType,
+        title,
+        content,
+        version: nextVersion,
+        language: data.language || "es_MX",
+        accepted,
+        accepted_at: acceptedAt,
+        accepted_by: accepted ? doctorId : null,
+        signature_type: signatureType,
+        document_hash: documentHash,
+        ip_address: ipAddress || null,
+        user_agent: userAgent || null,
+        revoked_at: data.revoked ? new Date() : null,
+        revoked_reason: data.revoked_reason
+          ? textOrNull(data.revoked_reason)
+          : null,
+      },
+      include: {
+        accepted_by_user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    await AuditLogService.log({
+      userId: doctorId,
+      action: accepted ? "SIGN" : "UPDATE",
+      targetModel: "CONSENT",
+      targetId: consent.id,
+      organizationId: patient.organization_id,
+      patientId: patient.id,
+      resourceType: "consent",
+      resourceId: consent.id,
+      accessGranted: true,
+      ipAddress,
+      userAgent,
+      afterSnapshot: consent,
+      reason: data.revoked ? textOrNull(data.revoked_reason) : null,
+      metadata: {
+        consent_type: consentType,
+        version: nextVersion,
+      },
+    });
+
+    return consent;
+  }
+
+  static async listConsents(doctorId, patientId) {
+    const { patient } = await loadRecordContext(doctorId, patientId);
+    return db.consent.findMany({
+      where: { patient_id: patient.id },
+      orderBy: [{ consent_type: "asc" }, { version: "desc" }],
+      include: {
+        accepted_by_user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            role: true,
+          },
+        },
+      },
+    });
+  }
+}
