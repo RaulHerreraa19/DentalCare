@@ -4,6 +4,84 @@ const AppError = require("../../utils/AppError");
 const { generateDigitalSeal } = require("../../utils/crypto");
 const AuditLogService = require("../audit/audit.service");
 
+const DEFAULT_TOOTH_DATA = [];
+
+const normalizeToothData = (value) => {
+  if (!value) return DEFAULT_TOOTH_DATA;
+
+  const normalizeEntry = (entry, fallbackToothNumber = null) => ({
+    patient_id: entry?.patient_id || null,
+    tooth_number:
+      `${entry?.tooth_number || entry?.toothNumber || fallbackToothNumber || ""}`.trim(),
+    status: `${entry?.status || ""}`.trim() || "NORMAL",
+    treatment: `${entry?.treatment || entry?.treatment_text || ""}`.trim(),
+    date: entry?.date || entry?.created_at || new Date().toISOString(),
+    notes: `${entry?.notes || entry?.finding_text || ""}`.trim(),
+    created_by: entry?.created_by || entry?.createdBy || null,
+    action: `${entry?.action || "UPDATE"}`.trim() || "UPDATE",
+    custom_status:
+      `${entry?.custom_status || entry?.customStatus || ""}`.trim(),
+  });
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => normalizeEntry(item))
+      .filter(
+        (item) =>
+          item.tooth_number || item.status || item.treatment || item.notes,
+      );
+  }
+
+  if (typeof value === "object") {
+    return Object.entries(value)
+      .flatMap(([toothNumber, item]) => {
+        if (Array.isArray(item)) {
+          return item.map((entry) => normalizeEntry(entry, toothNumber));
+        }
+
+        if (!item || typeof item !== "object") {
+          return [normalizeEntry({ tooth_number: toothNumber })];
+        }
+
+        return [normalizeEntry({ ...item, tooth_number: toothNumber })];
+      })
+      .filter(
+        (item) =>
+          item.tooth_number || item.status || item.treatment || item.notes,
+      );
+  }
+
+  return DEFAULT_TOOTH_DATA;
+};
+
+const attachLatestOdontogram = async (record) => {
+  if (!record) return record;
+
+  const latestOdontogram = await db.odontogram.findFirst({
+    where: { medical_record_id: record.id },
+    orderBy: { version: "desc" },
+    include: {
+      creator: {
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          role: true,
+          license_number: true,
+          specialty: true,
+        },
+      },
+    },
+  });
+
+  return {
+    ...record,
+    tooth_data: latestOdontogram?.tooth_data || DEFAULT_TOOTH_DATA,
+    odontogram_version: latestOdontogram?.version || null,
+    latest_odontogram: latestOdontogram,
+  };
+};
+
 class MedicalRecordsService {
   /**
    * Obtiene o inicializa el expediente para un binomio específico de médico-paciente.
@@ -40,7 +118,7 @@ class MedicalRecordsService {
       });
     }
 
-    return record;
+    return attachLatestOdontogram(record);
   }
 
   static async getAllRecordsByDoctor(doctorId) {
@@ -95,10 +173,10 @@ class MedicalRecordsService {
   }
 
   static async getHistory(doctorId, patientId) {
-    const { patient, record } = await this.getOrCreateRecord(
-      doctorId,
-      patientId,
-    );
+    const patient = await db.patient.findUnique({ where: { id: patientId } });
+    if (!patient) throw new AppError("Paciente no encontrado", 404);
+
+    const record = await this.getOrCreateRecord(doctorId, patientId);
 
     const [versions, noteVersions, odontograms, consents, auditLogs] =
       await Promise.all([
@@ -279,31 +357,78 @@ class MedicalRecordsService {
       }
     });
 
-    const record = await db.medicalRecord.update({
-      where: {
-        patient_id_doctor_id: {
-          patient_id: patientId,
-          doctor_id: doctorId,
-        },
-      },
-      data: updateData,
+    const toothData = normalizeToothData(
+      data.tooth_data ?? data.odontogram ?? data.tooth_entries,
+    );
+
+    const record = await db.$transaction(async (transaction) => {
+      const updatedRecord =
+        Object.keys(updateData).length > 0
+          ? await transaction.medicalRecord.update({
+              where: {
+                patient_id_doctor_id: {
+                  patient_id: patientId,
+                  doctor_id: doctorId,
+                },
+              },
+              data: updateData,
+            })
+          : await transaction.medicalRecord.findUnique({
+              where: {
+                patient_id_doctor_id: {
+                  patient_id: patientId,
+                  doctor_id: doctorId,
+                },
+              },
+            });
+
+      if (!updatedRecord) {
+        throw new AppError("Expediente no encontrado", 404);
+      }
+
+      if (toothData.length > 0) {
+        const latestOdontogram = await transaction.odontogram.findFirst({
+          where: { medical_record_id: updatedRecord.id },
+          orderBy: { version: "desc" },
+        });
+
+        await transaction.odontogram.create({
+          data: {
+            medical_record_id: updatedRecord.id,
+            created_by: doctorId,
+            tooth_data: toothData,
+            version: (latestOdontogram?.version || 0) + 1,
+            status: updatedRecord.status,
+            is_locked: updatedRecord.status === "CLOSED",
+            signed_at: updatedRecord.status === "CLOSED" ? new Date() : null,
+            signature_hash: null,
+          },
+        });
+      }
+
+      return updatedRecord;
     });
+
+    const latestRecord = await attachLatestOdontogram(record);
 
     await AuditLogService.log({
       userId: doctorId,
       action: "UPDATE",
       targetModel: "MEDICAL_RECORD",
-      targetId: record.id,
-      organizationId: record.organization_id,
+      targetId: latestRecord.id,
+      organizationId: latestRecord.organization_id,
       patientId,
       resourceType: "medical_record",
-      resourceId: record.id,
+      resourceId: latestRecord.id,
       accessGranted: true,
       ipAddress,
-      afterSnapshot: updateData,
+      afterSnapshot: {
+        ...updateData,
+        odontogram_entries: toothData.length,
+      },
     });
 
-    return record;
+    return latestRecord;
   }
 
   /**
@@ -433,7 +558,8 @@ class MedicalRecordsService {
   }
 
   static async listConsents(doctorId, patientId) {
-    const { patient } = await this.getOrCreateRecord(doctorId, patientId);
+    const patient = await db.patient.findUnique({ where: { id: patientId } });
+    if (!patient) throw new AppError("Paciente no encontrado", 404);
     return db.consent.findMany({
       where: { patient_id: patient.id },
       orderBy: [{ consent_type: "asc" }, { version: "desc" }],

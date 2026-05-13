@@ -12,4 +12,5 @@ RUN npx prisma generate
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev"]
+# Use non-dev start for production containers
+CMD ["npm", "start"]

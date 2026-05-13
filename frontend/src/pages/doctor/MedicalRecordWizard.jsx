@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../lib/axios';
 import Swal from 'sweetalert2';
+import { useAuth } from '../../context/AuthContext';
+import OdontogramVisualizer, { normalizeOdontogramRecords } from '../../components/odontogram/OdontogramVisualizer';
 import {
   User,
   FileText,
@@ -48,11 +50,6 @@ const CONSENT_LIBRARY = {
   }
 };
 
-const TOOTH_STATUS_OPTIONS = [
-  'NORMAL', 'CARIES', 'RESTORED', 'ENDODONTIC_TREATMENT', 'EXTRACTED',
-  'MISSING', 'CROWN', 'IMPLANT', 'SEALANT', 'FRACTURE', 'PERIODONTAL_FINDING'
-];
-
 const EMPTY_RECORD = {
   family_history: '',
   pathological_history: '',
@@ -91,6 +88,110 @@ const EMPTY_RECORD = {
   tooth_entries: [{ tooth_number: '', status: '', surfaces: '', finding_text: '', treatment_text: '' }]
 };
 
+const EMPTY_CONSENTS_STATE = Object.keys(CONSENT_LIBRARY).reduce((acc, key) => {
+  acc[key] = {
+    accepted: false,
+    title: CONSENT_LIBRARY[key].title,
+    content: CONSENT_LIBRARY[key].content,
+    signature_type: CONSENT_LIBRARY[key].signature_type,
+    version: 0,
+    latestAcceptedAt: null,
+  };
+  return acc;
+}, {});
+
+const extractClinicalNotes = (recordData = {}) => {
+  const clinicalNotes = recordData?.clinical_notes && typeof recordData.clinical_notes === 'object'
+    ? recordData.clinical_notes
+    : {};
+  const sections = clinicalNotes.sections && typeof clinicalNotes.sections === 'object'
+    ? clinicalNotes.sections
+    : clinicalNotes;
+
+  return {
+    history: sections.history || {},
+    interview: sections.interview || {},
+    exploration: sections.exploration || {},
+    diagnosis: sections.diagnosis || {},
+    plan: sections.plan || {},
+    odontogram: sections.odontogram || {},
+    note_summary: clinicalNotes.note_summary || recordData?.note_summary || '',
+  };
+};
+
+const buildClinicalNotesPayload = (form, odontogramRecords) => ({
+  sections: {
+    history: {
+      family_history: form.family_history,
+      pathological_history: form.pathological_history,
+      non_pathological_history: form.non_pathological_history,
+      allergies: form.allergies,
+      surgeries: form.surgeries,
+      current_medications: form.current_medications,
+      dental_history: form.dental_history,
+      brushing_frequency: form.brushing_frequency,
+      use_floss: form.use_floss,
+    },
+    interview: {
+      chief_complaint: form.chief_complaint,
+      symptoms_start_date: form.symptoms_start_date || null,
+      pain_presence: form.pain_presence,
+      pain_intensity: form.pain_intensity === '' ? null : Number(form.pain_intensity),
+      pain_character: form.pain_character,
+      pain_location: form.pain_location,
+      pain_triggers: form.pain_triggers,
+      pain_relief: form.pain_relief,
+      review_of_systems: form.review_of_systems,
+    },
+    exploration: {
+      extraoral_exam: form.extraoral_exam,
+      intraoral_exam: form.intraoral_exam,
+      periodontal_status: form.periodontal_status,
+      radiographic_findings: form.radiographic_findings,
+    },
+    diagnosis: {
+      primary_diagnosis: form.primary_diagnosis,
+      secondary_diagnoses: splitDiagnoses(form.secondary_diagnoses),
+      icd10_code: form.icd10_code,
+      diagnostic_basis: form.diagnostic_basis,
+    },
+    plan: {
+      treatment_objective: form.treatment_objective,
+      proposed_procedures: (form.proposed_procedures || []).filter((item) => item.name.trim()),
+      treatment_plan: form.treatment_plan,
+      risks_explained: form.risks_explained,
+      alternatives_explained: form.alternatives_explained,
+      follow_up_plan: form.follow_up_plan,
+      estimated_cost: form.estimated_cost === '' ? null : Number(form.estimated_cost),
+    },
+    odontogram: {
+      tooth_data: odontogramRecords,
+    },
+  },
+  note_summary: form.note_summary,
+  saved_at: new Date().toISOString(),
+});
+
+const normalizeRecord = (data = {}) => ({
+  ...EMPTY_RECORD,
+  ...extractClinicalNotes(data).history,
+  ...extractClinicalNotes(data).interview,
+  ...extractClinicalNotes(data).exploration,
+  ...extractClinicalNotes(data).diagnosis,
+  ...extractClinicalNotes(data).plan,
+  ...data,
+  proposed_procedures: Array.isArray(extractClinicalNotes(data).plan?.proposed_procedures) && extractClinicalNotes(data).plan.proposed_procedures.length > 0
+    ? extractClinicalNotes(data).plan.proposed_procedures
+    : Array.isArray(data?.proposed_procedures) && data.proposed_procedures.length > 0
+      ? data.proposed_procedures
+      : EMPTY_RECORD.proposed_procedures,
+  tooth_entries: Array.isArray(data?.tooth_entries) && data.tooth_entries.length > 0
+    ? data.tooth_entries
+    : normalizeToothEntries(extractClinicalNotes(data).odontogram?.tooth_data || data?.tooth_data || data?.odontogram || []),
+  note_summary: extractClinicalNotes(data).note_summary || data?.note_summary || '',
+  close_record: data?.status === 'CLOSED',
+});
+
 const STEPS = [
   { id: 1, label: 'Paciente', icon: User },
   { id: 2, label: 'Antecedentes', icon: FileText },
@@ -106,17 +207,20 @@ export default function MedicalRecordWizard() {
   const { patientId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const appointmentId = searchParams.get('appointmentId');
 
   const [currentStep, setCurrentStep] = useState(1);
   const [record, setRecord] = useState(EMPTY_RECORD);
   const [patient, setPatient] = useState(null);
   const [appointment, setAppointment] = useState(null);
+  const [odontogramRecords, setOdontogramRecords] = useState([]);
   const [consents, setConsents] = useState({
     DATA_PRIVACY: false,
     DENTAL_TREATMENT: false,
-    WHATSAPP: false
+    WHATSAPP: false,
   });
+  const [baselineConsents, setBaselineConsents] = useState(EMPTY_CONSENTS_STATE);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -126,21 +230,52 @@ export default function MedicalRecordWizard() {
 
   const loadPatientData = async () => {
     try {
-      const [patientRes, recordRes] = await Promise.all([
+      const [patientRes, recordRes, consentsRes] = await Promise.all([
         api.get(`/patients/${patientId}`),
-        api.get(`/medical-records/${patientId}`)
+        api.get(`/medical-records/${patientId}`),
+        api.get(`/medical-records/${patientId}/consents`)
       ]);
       
       setPatient(patientRes.data.data);
       if (recordRes.data.data) {
-        setRecord(recordRes.data.data);
+        setRecord(normalizeRecord(recordRes.data.data));
+        setOdontogramRecords(
+          normalizeOdontogramRecords(
+            recordRes.data.data?.tooth_data || recordRes.data.data?.odontogram || recordRes.data.data?.tooth_entries || [],
+            patientId,
+            user?.id,
+          ),
+        );
       }
+
+      const latestConsents = (consentsRes.data.data || []).reduce((acc, consent) => {
+        const current = acc[consent.consent_type];
+        if (!current || consent.version >= current.version) {
+          acc[consent.consent_type] = {
+            accepted: consent.accepted,
+            title: consent.title || current?.title || consent.consent_type,
+            content: consent.content || current?.content || '',
+            signature_type: consent.signature_type || current?.signature_type || 'CLICK_WRAP',
+            version: consent.version || 0,
+            latestAcceptedAt: consent.accepted_at || null,
+          };
+        }
+        return acc;
+      }, JSON.parse(JSON.stringify(EMPTY_CONSENTS_STATE)));
+      setBaselineConsents(latestConsents);
+      setConsents(Object.keys(latestConsents).reduce((acc, key) => {
+        acc[key] = latestConsents[key].accepted;
+        return acc;
+      }, {}));
 
       if (appointmentId) {
         const appointmentRes = await api.get(`/appointments/${appointmentId}`);
         setAppointment(appointmentRes.data.data);
         if (appointmentRes.data.data?.session_note) {
-          setRecord(prev => ({ ...prev, note_summary: appointmentRes.data.data.session_note }));
+          setRecord(prev => ({
+            ...normalizeRecord(prev),
+            note_summary: appointmentRes.data.data.session_note,
+          }));
         }
       }
 
@@ -156,7 +291,7 @@ export default function MedicalRecordWizard() {
   };
 
   const handleProcedureChange = (index, field, value) => {
-    const procedures = [...record.proposed_procedures];
+    const procedures = [...(record.proposed_procedures || EMPTY_RECORD.proposed_procedures)];
     procedures[index] = { ...procedures[index], [field]: value };
     setRecord(prev => ({ ...prev, proposed_procedures: procedures }));
   };
@@ -164,41 +299,26 @@ export default function MedicalRecordWizard() {
   const addProcedure = () => {
     setRecord(prev => ({
       ...prev,
-      proposed_procedures: [...prev.proposed_procedures, { name: '', tooth: '', code: '' }]
+      proposed_procedures: [...(prev.proposed_procedures || EMPTY_RECORD.proposed_procedures), { name: '', tooth: '', code: '' }]
     }));
   };
 
   const removeProcedure = (index) => {
     setRecord(prev => ({
       ...prev,
-      proposed_procedures: prev.proposed_procedures.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleToothChange = (index, field, value) => {
-    const teeth = [...record.tooth_entries];
-    teeth[index] = { ...teeth[index], [field]: value };
-    setRecord(prev => ({ ...prev, tooth_entries: teeth }));
-  };
-
-  const addToothEntry = () => {
-    setRecord(prev => ({
-      ...prev,
-      tooth_entries: [...prev.tooth_entries, { tooth_number: '', status: '', surfaces: '', finding_text: '', treatment_text: '' }]
-    }));
-  };
-
-  const removeToothEntry = (index) => {
-    setRecord(prev => ({
-      ...prev,
-      tooth_entries: prev.tooth_entries.filter((_, i) => i !== index)
+      proposed_procedures: (prev.proposed_procedures || EMPTY_RECORD.proposed_procedures).filter((_, i) => i !== index)
     }));
   };
 
   const saveRecord = async () => {
     try {
       setSaving(true);
-      const response = await api.patch(`/medical-records/${patientId}`, record);
+      const response = await api.patch(`/medical-records/${patientId}`, {
+        ...record,
+        status: 'CLOSED',
+        tooth_data: odontogramRecords,
+        clinical_notes: buildClinicalNotesPayload(record, odontogramRecords),
+      });
       Swal.fire('Guardado', 'Expediente guardado exitosamente', 'success');
       return response.data.data;
     } catch (error) {
@@ -211,7 +331,6 @@ export default function MedicalRecordWizard() {
 
   const handleNext = async () => {
     if (currentStep < STEPS.length) {
-      await saveRecord();
       setCurrentStep(currentStep + 1);
     }
   };
@@ -225,6 +344,24 @@ export default function MedicalRecordWizard() {
   const handleFinish = async () => {
     try {
       await saveRecord();
+
+      const consentChanges = Object.keys(consents).filter(
+        (key) => consents[key] !== baselineConsents[key]?.accepted,
+      );
+
+      for (const consentType of consentChanges) {
+        const base = baselineConsents[consentType] || EMPTY_CONSENTS_STATE[consentType];
+        await api.post(`/medical-records/${patientId}/consents`, {
+          consent_type: consentType,
+          title: base.title,
+          content: base.content,
+          accepted: consents[consentType],
+          signature_type: base.signature_type,
+          language: 'es_MX',
+          revoked: baselineConsents[consentType]?.accepted && !consents[consentType],
+          revoked_reason: baselineConsents[consentType]?.accepted && !consents[consentType] ? 'Revocado desde el expediente clínico' : null,
+        });
+      }
       
       if (appointmentId) {
         await api.patch(`/appointments/${appointmentId}`, {
@@ -513,74 +650,13 @@ export default function MedicalRecordWizard() {
 
           {/* Step 5: Odontogram */}
           {currentStep === 5 && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                <p className="text-sm text-blue-900">
-                  Ingrese el estado de cada pieza dental. Puede agregar múltiples entradas.
-                </p>
-              </div>
-              {record.tooth_entries.map((entry, index) => (
-                <div key={index} className="border border-slate-200 p-4 rounded-lg">
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-medium">Pieza {index + 1}</h4>
-                    <button
-                      onClick={() => removeToothEntry(index)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        Número de Pieza
-                      </label>
-                      <input
-                        type="text"
-                        value={entry.tooth_number}
-                        onChange={(e) => handleToothChange(index, 'tooth_number', e.target.value)}
-                        placeholder="Ej: 1.1, 2.6"
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        Estado
-                      </label>
-                      <select
-                        value={entry.status}
-                        onChange={(e) => handleToothChange(index, 'status', e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Seleccionar...</option>
-                        {TOOTH_STATUS_OPTIONS.map(option => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Observaciones
-                    </label>
-                    <textarea
-                      value={entry.finding_text}
-                      onChange={(e) => handleToothChange(index, 'finding_text', e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      rows="2"
-                      placeholder="Hallazgos adicionales"
-                    />
-                  </div>
-                </div>
-              ))}
-              <button
-                onClick={addToothEntry}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                <Plus size={18} />
-                Agregar Pieza
-              </button>
-            </div>
+            <OdontogramVisualizer
+              value={odontogramRecords}
+              onChange={setOdontogramRecords}
+              patientId={patientId}
+              createdBy={user?.id}
+              subtitle="Haz clic sobre una pieza para abrir el panel lateral y registrar su historial clínico."
+            />
           )}
 
           {/* Step 6: Diagnosis & Plan */}
@@ -623,10 +699,10 @@ export default function MedicalRecordWizard() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-900 mb-2 flex items-center gap-2">
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-900 mb-2">
                   <Plus size={18} /> Procedimientos Propuestos
                 </label>
-                {record.proposed_procedures.map((proc, index) => (
+                {(record.proposed_procedures || EMPTY_RECORD.proposed_procedures).map((proc, index) => (
                   <div key={index} className="flex gap-2 mb-2">
                     <input
                       type="text"
@@ -751,7 +827,7 @@ export default function MedicalRecordWizard() {
               className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
               <CheckCircle size={18} />
-              {saving ? 'Guardando...' : 'Finalizar'}
+              {saving ? 'Guardando...' : 'Finalizar y guardar'}
             </button>
           ) : (
             <button

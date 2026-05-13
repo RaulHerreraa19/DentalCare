@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../lib/axios';
 import Swal from 'sweetalert2';
+import OdontogramVisualizer, { normalizeOdontogramRecords } from '../../components/odontogram/OdontogramVisualizer';
 import {
   User,
   FileText,
@@ -113,6 +114,78 @@ const EMPTY_CONSENTS = Object.keys(CONSENT_LIBRARY).reduce((acc, key) => {
   return acc;
 }, {});
 
+const extractClinicalNotes = (recordData = {}) => {
+  const clinicalNotes = recordData?.clinical_notes && typeof recordData.clinical_notes === 'object'
+    ? recordData.clinical_notes
+    : {};
+  const sections = clinicalNotes.sections && typeof clinicalNotes.sections === 'object'
+    ? clinicalNotes.sections
+    : clinicalNotes;
+
+  return {
+    history: sections.history || {},
+    interview: sections.interview || {},
+    exploration: sections.exploration || {},
+    diagnosis: sections.diagnosis || {},
+    plan: sections.plan || {},
+    odontogram: sections.odontogram || {},
+    note_summary: clinicalNotes.note_summary || recordData?.note_summary || '',
+  };
+};
+
+const buildClinicalNotesPayload = (form) => ({
+  sections: {
+    history: {
+      family_history: form.family_history,
+      pathological_history: form.pathological_history,
+      non_pathological_history: form.non_pathological_history,
+      allergies: form.allergies,
+      surgeries: form.surgeries,
+      current_medications: form.current_medications,
+      dental_history: form.dental_history,
+      brushing_frequency: form.brushing_frequency,
+      use_floss: form.use_floss,
+    },
+    interview: {
+      chief_complaint: form.chief_complaint,
+      symptoms_start_date: form.symptoms_start_date || null,
+      pain_presence: form.pain_presence,
+      pain_intensity: form.pain_intensity === '' ? null : Number(form.pain_intensity),
+      pain_character: form.pain_character,
+      pain_location: form.pain_location,
+      pain_triggers: form.pain_triggers,
+      pain_relief: form.pain_relief,
+      review_of_systems: form.review_of_systems,
+    },
+    exploration: {
+      extraoral_exam: form.extraoral_exam,
+      intraoral_exam: form.intraoral_exam,
+      periodontal_status: form.periodontal_status,
+      radiographic_findings: form.radiographic_findings,
+    },
+    diagnosis: {
+      primary_diagnosis: form.primary_diagnosis,
+      secondary_diagnoses: splitDiagnoses(form.secondary_diagnoses),
+      icd10_code: form.icd10_code,
+      diagnostic_basis: form.diagnostic_basis,
+    },
+    plan: {
+      treatment_objective: form.treatment_objective,
+      proposed_procedures: (form.proposed_procedures || []).filter((item) => item.name.trim()),
+      treatment_plan: form.treatment_plan,
+      risks_explained: form.risks_explained,
+      alternatives_explained: form.alternatives_explained,
+      follow_up_plan: form.follow_up_plan,
+      estimated_cost: form.estimated_cost === '' ? null : Number(form.estimated_cost),
+    },
+    odontogram: {
+      tooth_data: buildToothData(form.tooth_entries),
+    },
+  },
+  note_summary: form.note_summary,
+  saved_at: new Date().toISOString(),
+});
+
 const cloneEmptyRecord = () => ({
   ...EMPTY_RECORD,
   proposed_procedures: [{ name: '', tooth: '', code: '' }],
@@ -161,6 +234,30 @@ const normalizeToothEntries = (value) => {
     surfaces: Array.isArray(item?.surfaces) ? item.surfaces.join(', ') : (item?.surfaces || ''),
     finding_text: item?.notes || item?.finding_text || '',
     treatment_text: item?.treatment_text || '',
+  }));
+};
+
+const toVisualizerOdontogram = (entries) => {
+  return normalizeOdontogramRecords(entries || []).map((entry) => ({
+    patient_id: entry.patient_id || null,
+    tooth_number: entry.tooth_number,
+    status: entry.status || 'SANO',
+    custom_status: entry.custom_status || '',
+    treatment: entry.treatment || entry.treatment_text || '',
+    notes: entry.notes || '',
+    surfaces: entry.surfaces || '',
+    date: entry.date || new Date().toISOString(),
+    created_by: entry.created_by || null,
+  }));
+};
+
+const fromVisualizerOdontogram = (records) => {
+  return (records || []).map((entry) => ({
+    tooth_number: entry.tooth_number || '',
+    status: entry.status || '',
+    surfaces: entry.surfaces || '',
+    finding_text: entry.notes || '',
+    treatment_text: entry.treatment || '',
   }));
 };
 
@@ -214,49 +311,56 @@ const hydrateRecord = (recordData) => {
   const diagnosis = sections.diagnosis || {};
   const plan = sections.plan || {};
   const odontogram = sections.odontogram || {};
+  const clinicalNotes = extractClinicalNotes(recordData);
 
   const nextState = cloneEmptyRecord();
 
-  nextState.family_history = history.family_history || recordData?.family_history || '';
-  nextState.pathological_history = history.pathological_history || recordData?.pathological_history || '';
-  nextState.non_pathological_history = history.non_pathological_history || recordData?.non_pathological_history || '';
-  nextState.allergies = history.allergies || recordData?.allergies || '';
-  nextState.surgeries = history.surgeries || recordData?.surgeries || '';
-  nextState.current_medications = history.current_medications || recordData?.current_medications || '';
-  nextState.dental_history = history.dental_history || recordData?.dental_history || '';
-  nextState.brushing_frequency = history.brushing_frequency || recordData?.brushing_frequency || '';
-  nextState.use_floss = typeof history.use_floss === 'boolean' ? history.use_floss : Boolean(recordData?.use_floss);
+  nextState.family_history = clinicalNotes.history.family_history || history.family_history || recordData?.family_history || '';
+  nextState.pathological_history = clinicalNotes.history.pathological_history || history.pathological_history || recordData?.pathological_history || '';
+  nextState.non_pathological_history = clinicalNotes.history.non_pathological_history || history.non_pathological_history || recordData?.non_pathological_history || '';
+  nextState.allergies = clinicalNotes.history.allergies || history.allergies || recordData?.allergies || '';
+  nextState.surgeries = clinicalNotes.history.surgeries || history.surgeries || recordData?.surgeries || '';
+  nextState.current_medications = clinicalNotes.history.current_medications || history.current_medications || recordData?.current_medications || '';
+  nextState.dental_history = clinicalNotes.history.dental_history || history.dental_history || recordData?.dental_history || '';
+  nextState.brushing_frequency = clinicalNotes.history.brushing_frequency || history.brushing_frequency || recordData?.brushing_frequency || '';
+  nextState.use_floss = typeof clinicalNotes.history.use_floss === 'boolean'
+    ? clinicalNotes.history.use_floss
+    : (typeof history.use_floss === 'boolean' ? history.use_floss : Boolean(recordData?.use_floss));
 
-  nextState.chief_complaint = interview.chief_complaint || '';
-  nextState.symptoms_start_date = formatDateInput(interview.symptoms_start_date);
-  nextState.pain_presence = typeof interview.pain_presence === 'boolean' ? interview.pain_presence : false;
-  nextState.pain_intensity = interview.pain_intensity ?? '';
-  nextState.pain_character = interview.pain_character || '';
-  nextState.pain_location = interview.pain_location || '';
-  nextState.pain_triggers = interview.pain_triggers || '';
-  nextState.pain_relief = interview.pain_relief || '';
-  nextState.review_of_systems = interview.review_of_systems || '';
+  nextState.chief_complaint = clinicalNotes.interview.chief_complaint || interview.chief_complaint || '';
+  nextState.symptoms_start_date = formatDateInput(clinicalNotes.interview.symptoms_start_date || interview.symptoms_start_date);
+  nextState.pain_presence = typeof clinicalNotes.interview.pain_presence === 'boolean'
+    ? clinicalNotes.interview.pain_presence
+    : (typeof interview.pain_presence === 'boolean' ? interview.pain_presence : false);
+  nextState.pain_intensity = clinicalNotes.interview.pain_intensity ?? interview.pain_intensity ?? '';
+  nextState.pain_character = clinicalNotes.interview.pain_character || interview.pain_character || '';
+  nextState.pain_location = clinicalNotes.interview.pain_location || interview.pain_location || '';
+  nextState.pain_triggers = clinicalNotes.interview.pain_triggers || interview.pain_triggers || '';
+  nextState.pain_relief = clinicalNotes.interview.pain_relief || interview.pain_relief || '';
+  nextState.review_of_systems = clinicalNotes.interview.review_of_systems || interview.review_of_systems || '';
 
-  nextState.extraoral_exam = exploration.extraoral_exam || '';
-  nextState.intraoral_exam = exploration.intraoral_exam || '';
-  nextState.periodontal_status = exploration.periodontal_status || '';
-  nextState.radiographic_findings = exploration.radiographic_findings || '';
+  nextState.extraoral_exam = clinicalNotes.exploration.extraoral_exam || exploration.extraoral_exam || '';
+  nextState.intraoral_exam = clinicalNotes.exploration.intraoral_exam || exploration.intraoral_exam || '';
+  nextState.periodontal_status = clinicalNotes.exploration.periodontal_status || exploration.periodontal_status || '';
+  nextState.radiographic_findings = clinicalNotes.exploration.radiographic_findings || exploration.radiographic_findings || '';
 
-  nextState.primary_diagnosis = diagnosis.primary_diagnosis || recordData?.diagnosis || '';
-  nextState.secondary_diagnoses = Array.isArray(diagnosis.secondary_diagnoses)
-    ? diagnosis.secondary_diagnoses.join('\n')
-    : (recordData?.secondary_diagnoses || '');
-  nextState.icd10_code = diagnosis.icd10_code || '';
-  nextState.diagnostic_basis = diagnosis.diagnostic_basis || '';
+  nextState.primary_diagnosis = clinicalNotes.diagnosis.primary_diagnosis || diagnosis.primary_diagnosis || recordData?.diagnosis || '';
+  nextState.secondary_diagnoses = Array.isArray(clinicalNotes.diagnosis.secondary_diagnoses)
+    ? clinicalNotes.diagnosis.secondary_diagnoses.join('\n')
+    : (Array.isArray(diagnosis.secondary_diagnoses)
+      ? diagnosis.secondary_diagnoses.join('\n')
+      : (recordData?.secondary_diagnoses || ''));
+  nextState.icd10_code = clinicalNotes.diagnosis.icd10_code || diagnosis.icd10_code || '';
+  nextState.diagnostic_basis = clinicalNotes.diagnosis.diagnostic_basis || diagnosis.diagnostic_basis || '';
 
-  nextState.treatment_objective = plan.treatment_objective || '';
-  nextState.proposed_procedures = normalizeProcedureList(plan.proposed_procedures || recordData?.proposed_procedures || []);
-  nextState.treatment_plan = plan.treatment_plan || recordData?.treatment_plan || '';
-  nextState.risks_explained = plan.risks_explained || '';
-  nextState.alternatives_explained = plan.alternatives_explained || '';
-  nextState.follow_up_plan = plan.follow_up_plan || '';
-  nextState.estimated_cost = plan.estimated_cost ?? '';
-  nextState.note_summary = recordData?.clinical_notes?.note_summary || '';
+  nextState.treatment_objective = clinicalNotes.plan.treatment_objective || plan.treatment_objective || '';
+  nextState.proposed_procedures = normalizeProcedureList(clinicalNotes.plan.proposed_procedures || plan.proposed_procedures || recordData?.proposed_procedures || []);
+  nextState.treatment_plan = clinicalNotes.plan.treatment_plan || plan.treatment_plan || recordData?.treatment_plan || '';
+  nextState.risks_explained = clinicalNotes.plan.risks_explained || plan.risks_explained || '';
+  nextState.alternatives_explained = clinicalNotes.plan.alternatives_explained || plan.alternatives_explained || '';
+  nextState.follow_up_plan = clinicalNotes.plan.follow_up_plan || plan.follow_up_plan || '';
+  nextState.estimated_cost = clinicalNotes.plan.estimated_cost ?? plan.estimated_cost ?? '';
+  nextState.note_summary = clinicalNotes.note_summary || recordData?.clinical_notes?.note_summary || '';
 
   nextState.tooth_entries = normalizeToothEntries(odontogram.tooth_data || recordData?.tooth_data || recordData?.odontogram || []);
   nextState.close_record = recordData?.status === 'CLOSED';
@@ -682,42 +786,14 @@ export default function MedicalRecordEditor() {
       setSaving(true);
 
       const payload = {
-        family_history: form.family_history,
-        pathological_history: form.pathological_history,
-        non_pathological_history: form.non_pathological_history,
-        allergies: form.allergies,
-        surgeries: form.surgeries,
-        current_medications: form.current_medications,
-        dental_history: form.dental_history,
-        brushing_frequency: form.brushing_frequency,
-        use_floss: form.use_floss,
-        chief_complaint: form.chief_complaint,
-        symptoms_start_date: form.symptoms_start_date || null,
-        pain_presence: form.pain_presence,
-        pain_intensity: form.pain_intensity === '' ? null : Number(form.pain_intensity),
-        pain_character: form.pain_character,
-        pain_location: form.pain_location,
-        pain_triggers: form.pain_triggers,
-        pain_relief: form.pain_relief,
-        review_of_systems: form.review_of_systems,
-        extraoral_exam: form.extraoral_exam,
-        intraoral_exam: form.intraoral_exam,
-        periodontal_status: form.periodontal_status,
-        radiographic_findings: form.radiographic_findings,
-        primary_diagnosis: form.primary_diagnosis,
+        ...form,
+        tooth_data: buildToothData(form.tooth_entries),
+        clinical_notes: buildClinicalNotesPayload({ ...form, note_summary: form.note_summary || sessionNote }, form.tooth_entries),
         diagnosis: form.primary_diagnosis,
         secondary_diagnoses: splitDiagnoses(form.secondary_diagnoses),
-        icd10_code: form.icd10_code,
-        diagnostic_basis: form.diagnostic_basis,
-        treatment_objective: form.treatment_objective,
-        proposed_procedures: form.proposed_procedures.filter((item) => item.name.trim()),
-        treatment_plan: form.treatment_plan,
-        risks_explained: form.risks_explained,
-        alternatives_explained: form.alternatives_explained,
-        follow_up_plan: form.follow_up_plan,
         estimated_cost: form.estimated_cost === '' ? null : Number(form.estimated_cost),
-        note_summary: form.note_summary || sessionNote,
-        tooth_data: buildToothData(form.tooth_entries),
+        symptoms_start_date: form.symptoms_start_date || null,
+        pain_intensity: form.pain_intensity === '' ? null : Number(form.pain_intensity),
         close_record: form.close_record,
       };
 
@@ -988,46 +1064,17 @@ export default function MedicalRecordEditor() {
             </div>
           </SectionCard>
 
-          <SectionCard title="Odontograma" icon={Building2} accent="amber" subtitle="Captura por pieza dental. Se guarda en el expediente como estructura JSON.">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[11px] text-slate-500">Puedes capturar una o varias piezas. Si no aplica, deja la sección vacía.</div>
-                <button type="button" onClick={addToothRow} className="text-[10px] font-black uppercase tracking-[0.18em] px-3 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700">
-                  + Agregar pieza
-                </button>
-              </div>
-              <div className="space-y-4">
-                {form.tooth_entries.map((row, index) => (
-                  <div key={index} className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                      <div className="md:col-span-2">
-                        <input className="w-full border rounded-xl px-4 py-3 text-sm" placeholder="Pieza" value={row.tooth_number} onChange={(e) => updateToothRow(index, 'tooth_number', e.target.value)} />
-                      </div>
-                      <div className="md:col-span-3">
-                        <select className="w-full border rounded-xl px-4 py-3 text-sm bg-white" value={row.status} onChange={(e) => updateToothRow(index, 'status', e.target.value)}>
-                          <option value="">Estado</option>
-                          {TOOTH_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                        </select>
-                      </div>
-                      <div className="md:col-span-4">
-                        <input className="w-full border rounded-xl px-4 py-3 text-sm" placeholder="Superficies (M, O, D...)" value={row.surfaces} onChange={(e) => updateToothRow(index, 'surfaces', e.target.value)} />
-                      </div>
-                      <div className="md:col-span-3 flex items-center justify-end">
-                        {form.tooth_entries.length > 1 && (
-                          <button type="button" onClick={() => removeToothRow(index)} className="text-rose-600 hover:text-rose-700 p-2">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <textarea className="w-full border rounded-xl px-4 py-3 text-sm min-h-[96px]" placeholder="Hallazgo" value={row.finding_text} onChange={(e) => updateToothRow(index, 'finding_text', e.target.value)} />
-                      <textarea className="w-full border rounded-xl px-4 py-3 text-sm min-h-[96px]" placeholder="Tratamiento" value={row.treatment_text} onChange={(e) => updateToothRow(index, 'treatment_text', e.target.value)} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <SectionCard title="Odontograma" icon={Building2} accent="amber" subtitle="Captura visual por pieza dental con historial por diente.">
+            <OdontogramVisualizer
+              value={toVisualizerOdontogram(form.tooth_entries)}
+              onChange={(records) => {
+                setForm((prev) => ({
+                  ...prev,
+                  tooth_entries: fromVisualizerOdontogram(records),
+                }));
+              }}
+              subtitle="Haz clic en una pieza para abrir el panel lateral y registrar cambios clínicos."
+            />
           </SectionCard>
 
           <SectionCard title="Consentimientos" icon={ShieldCheck} accent="slate" subtitle="Debes capturar aceptación explícita para datos sensibles, tratamiento y WhatsApp.">
