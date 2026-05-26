@@ -13,4 +13,4 @@ RUN npx prisma generate
 EXPOSE 3000
 
 # Use non-dev start for production containers
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
