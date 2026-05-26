@@ -20,11 +20,14 @@ const medicalRecordsRouter = require("./modules/medical-records/medical-records.
 const prescriptionsRouter = require("./modules/prescriptions/prescriptions.router");
 const uploadsRouter = require("./modules/uploads/uploads.router");
 const remindersRouter = require("./modules/reminders/reminders.router");
+const storageService = require("./services/storage.service");
 
 const app = express();
 
 app.use(express.static(path.join(__dirname, "public")));
-app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
+if (!storageService.isR2Enabled()) {
+  app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
+}
 
 // Middlewares
 app.use(helmet());

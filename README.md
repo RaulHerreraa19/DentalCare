@@ -91,7 +91,7 @@ Set these variables if you want uploads to go to Cloudflare R2 instead of local 
 | `R2_ENDPOINT` | Optional custom endpoint; defaults to `https://<account_id>.r2.cloudflarestorage.com` when `R2_ACCOUNT_ID` is present | No |
 | `R2_REGION` | Optional region value for the S3 client; defaults to `auto` | No |
 
-If those R2 variables are not present, the backend falls back to local storage under `backend/src/public/uploads` and serves files from `/uploads`.
+If those R2 variables are not present, the backend falls back to local storage under `backend/src/public/uploads` and serves files from `/uploads` in local development only. In R2 mode, uploaded files are returned as public URLs like `https://pub-xxxx.r2.dev/signatures/archivo.png`.
 
 ---
 
