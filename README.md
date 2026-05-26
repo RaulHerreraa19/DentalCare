@@ -77,6 +77,22 @@
 | `JWT_SECRET` | Secret for access tokens | - |
 | `JWT_REFRESH_SECRET` | Secret for refresh tokens | - |
 
+### Cloudflare R2 Storage (`backend/.env`)
+
+Set these variables if you want uploads to go to Cloudflare R2 instead of local disk.
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `R2_ACCOUNT_ID` | Cloudflare account ID that owns the bucket | Optional if `R2_ENDPOINT` is set |
+| `R2_ACCESS_KEY_ID` | R2 access key ID | Yes |
+| `R2_SECRET_ACCESS_KEY` | R2 secret access key | Yes |
+| `R2_BUCKET_NAME` | R2 bucket name | Yes |
+| `R2_PUBLIC_URL` | Public base URL for the bucket or custom domain, used to return permanent image URLs | Yes |
+| `R2_ENDPOINT` | Optional custom endpoint; defaults to `https://<account_id>.r2.cloudflarestorage.com` when `R2_ACCOUNT_ID` is present | No |
+| `R2_REGION` | Optional region value for the S3 client; defaults to `auto` | No |
+
+If those R2 variables are not present, the backend falls back to local storage under `backend/src/public/uploads` and serves files from `/uploads`.
+
 ---
 
 ## 📂 Project Structure
