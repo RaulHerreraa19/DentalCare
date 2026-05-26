@@ -30,7 +30,12 @@ app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.VITE_API_URL || "http://localhost:5173",
+    origin: [
+      "*",
+      "http://localhost:5173",
+      "https://dentalcare-irma.onrender.com",
+      process.env.VITE_API_URL,
+    ],
     credentials: true,
   }),
 );
