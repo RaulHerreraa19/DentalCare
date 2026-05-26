@@ -7,6 +7,7 @@ import { Layout, ProtectedRoute } from './components/Layout';
 import Login from './pages/Login';
 import SuperAdminDashboard from './pages/superadmin/Dashboard';
 import Organizations from './pages/superadmin/Organizations';
+import OrganizationCreate from './pages/superadmin/OrganizationCreate';
 import OrganizationDetails from './pages/superadmin/OrganizationDetails';
 import OwnerDashboard from './pages/owner/Dashboard';
 import OwnerClinics from './pages/owner/Clinics';
@@ -63,6 +64,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
                 <Organizations />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/superadmin/organizations/new" 
+            element={
+              <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+                <OrganizationCreate />
               </ProtectedRoute>
             } 
           />

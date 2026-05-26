@@ -39,6 +39,14 @@
 
 ---
 
+## 🎨 Design System
+
+The frontend uses approved UI primitives and semantic tokens to keep the clinical interface consistent across screens. Reuse the documented components instead of introducing one-off patterns, so spacing, typography, and interactions stay aligned with the product standard. New primitives should only be added when there is a clear justification and a repeated need.
+
+See the governance guide: [docs/FRONTEND_DESIGN_SYSTEM_GOVERNANCE.md](docs/FRONTEND_DESIGN_SYSTEM_GOVERNANCE.md)
+
+---
+
 ## 🛠️ Quick Start
 
 ### Prerequisites

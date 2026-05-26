@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../lib/axios';
 import { Building2, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -62,7 +63,18 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Panel Global</h1>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Panel Global</h1>
+          <p className="text-sm text-gray-500">Control central para negocios, sucursales y activaciones.</p>
+        </div>
+        <Link
+          to="/superadmin/organizations/new"
+          className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+        >
+          Nuevo Negocio
+        </Link>
+      </div>
       
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

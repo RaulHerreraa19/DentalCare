@@ -25,7 +25,8 @@ class UploadsController {
       } else {
         // Manejar base64 desde el SignatureCanvas
         const base64Data = String(req.body.base64 || "").replace(
-          /^data:image\/\w+;base64,/, "",
+          /^data:image\/\w+;base64,/,
+          "",
         );
         buffer = Buffer.from(base64Data, "base64");
       }

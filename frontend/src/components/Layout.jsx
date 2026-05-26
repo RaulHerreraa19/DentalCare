@@ -48,7 +48,7 @@ export const Layout = () => {
   const getMenuOptions = () => menuOptions[user?.role] || [];
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans antialiased text-slate-900">
+    <div className="flex h-screen bg-canvas font-sans antialiased text-ink">
       {/* Sidebar Corporativo */}
       <aside className="w-72 bg-slate-900 flex flex-col shadow-2xl z-20">
         <div className="h-20 flex items-center px-8 border-b border-slate-800">
@@ -100,17 +100,17 @@ export const Layout = () => {
       {/* Area de Trabajo */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Top bar sutil */}
-        <header className="h-14 bg-white border-b border-slate-200 flex items-center px-8 justify-between z-10">
-           <div className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
+          <header className="h-14 bg-surface border-b border-border flex items-center px-layout justify-between z-10 shadow-soft">
+            <div className="text-caption text-muted font-bold uppercase tracking-[0.2em]">
              Sincronización segura de datos operativos
            </div>
-           <div className="flex items-center space-x-1 text-[10px] font-bold text-slate-400 uppercase">
+            <div className="flex items-center space-x-1 text-caption font-bold text-muted uppercase">
               <FileText className="w-3 h-3" />
               <span>Version 2.4.0</span>
            </div>
         </header>
 
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 relative">
+          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-canvas relative">
           <div className="absolute inset-0 bg-grid-slate-200/[0.05] [mask-image:linear-gradient(to_bottom,white,transparent)] pointer-events-none" />
           <div className="relative z-10">
             <Outlet />

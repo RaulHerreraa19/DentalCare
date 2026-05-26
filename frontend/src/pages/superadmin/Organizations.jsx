@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Building, Plus, Search, Shield, ArrowUpRight } from 'lucide-react';
+import { Building, Plus, Search, ArrowUpRight } from 'lucide-react';
 import api from '../../lib/axios';
 
 export default function Organizations() {
@@ -37,10 +37,13 @@ export default function Organizations() {
           <h1 className="text-2xl font-bold text-gray-900">Gestión de Negocios</h1>
           <p className="text-gray-500">Administra todas las clínicas y organizaciones en la plataforma.</p>
         </div>
-        <button className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium">
+        <Link
+          to="/superadmin/organizations/new"
+          className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Negocio
-        </button>
+        </Link>
       </div>
 
       {/* Filters & Search */}
