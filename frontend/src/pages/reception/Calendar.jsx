@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -6,6 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import api from '../../lib/axios';
 import { Calendar as CalendarIcon, Filter, MapPin, User, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Calendar() {
   const [appointments, setAppointments] = useState([]);
@@ -165,9 +166,23 @@ export default function Calendar() {
 // ======================= MODAL CREAR CITA (REDISEÑO FORMAL) =======================
 function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) {
   const [patients, setPatients] = useState([]);
+  const [selectedPatient, setSelectedPatient] = useState(null); // full object for display when not in current page
   const [doctors, setDoctors] = useState([]);
   const [offices, setOffices] = useState([]);
-  
+  const [initialPatientsLoading, setInitialPatientsLoading] = useState(true);
+  const [patientsActionLoading, setPatientsActionLoading] = useState(null); // 'search' | 'pagination' | null
+  const [patientsError, setPatientsError] = useState('');
+  const [patientQuery, setPatientQuery] = useState('');
+  const [debouncedPatientQuery, setDebouncedPatientQuery] = useState('');
+  const [patientPage, setPatientPage] = useState(1);
+  const [patientPageSize, setPatientPageSize] = useState(10);
+  const [patientTotal, setPatientTotal] = useState(0);
+  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef(null);
+  const [pendingOpPatient, setPendingOpPatient] = useState(null);
+  const inflightPatientsKeyRef = useRef(null);
+  const selectedPatientFetchIdRef = useRef(0);
+
   const [formData, setFormData] = useState({
     patient_id: '',
     doctor_id: '',
@@ -177,15 +192,182 @@ function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) 
     reason: ''
   });
 
+  const { user } = useAuth();
+  const mountedRef = useRef(true);
+
   useEffect(() => {
-    api.get('/patients').then(res => setPatients(res.data.data || [])).catch(console.error);
+    return () => {
+      mountedRef.current = false;
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // load other static lists; patient list will be loaded by central effect
     api.get('/users/team').then(res => {
       setDoctors((res.data.data || []).filter(u => u.role === 'DOCTOR'));
     }).catch(console.error);
     if (clinicId) {
       api.get(`/clinics/${clinicId}/offices`).then(res => setOffices(res.data.data || [])).catch(console.error);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setPendingOpPatient('initial');
   }, [clinicId]);
+
+  // when a patient_id is selected but not present in current `patients`, fetch its details
+  useEffect(() => {
+    const pid = formData.patient_id;
+    if (!pid) {
+      setSelectedPatient(null);
+      return;
+    }
+
+    // if already in current page, use that object
+    const found = patients.find(p => p.id === pid);
+    if (found) {
+      setSelectedPatient(found);
+      return;
+    }
+
+    // otherwise fetch single patient to keep label stable; guard with fetch id to avoid stale overwrite
+    const fetchId = ++selectedPatientFetchIdRef.current;
+    (async () => {
+      try {
+        const res = await api.get(`/patients/${pid}`);
+        if (fetchId !== selectedPatientFetchIdRef.current) return;
+        if (!mountedRef.current) return;
+        const p = res.data.data;
+        // If backend returned an organization_id and it doesn't match current user's org, treat as unauthorized
+        if (p && p.organization_id && user && p.organization_id !== user.organization_id) {
+          console.warn('Selected patient belongs to a different organization — ignoring');
+          setPatientsError('No tiene permiso para ver los detalles de este paciente.');
+          setSelectedPatient(null);
+          setFormData({ ...formData, patient_id: '' });
+          return;
+        }
+        setSelectedPatient(p);
+      } catch (err) {
+        console.error('Could not fetch selected patient', err);
+        if (!mountedRef.current) return;
+        if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+          setPatientsError(err.response.data?.message || 'No autorizado para ver este paciente');
+          setSelectedPatient(null);
+          setFormData({ ...formData, patient_id: '' });
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.patient_id, patients]);
+
+  const fetchPatients = async ({ resetPage = false, usePage = patientPage, usePageSize = patientPageSize, q = undefined, op = 'refresh' } = {}) => {
+    const query = typeof q !== 'undefined' ? q : debouncedPatientQuery || undefined;
+    const targetPage = resetPage ? 1 : usePage;
+    try {
+      setPatientsError('');
+      if (op === 'initial') setInitialPatientsLoading(true);
+      else setPatientsActionLoading(op);
+
+      const key = JSON.stringify({ q: query || undefined, page: targetPage, pageSize: usePageSize });
+      if (inflightPatientsKeyRef.current && inflightPatientsKeyRef.current === key) return;
+      inflightPatientsKeyRef.current = key;
+
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      const reqId = ++requestIdRef.current;
+
+      const params = {
+        mode: 'paginated',
+        q: query || undefined,
+        page: targetPage,
+        pageSize: usePageSize,
+        sortBy: 'created_at',
+        sortDir: 'desc'
+      };
+
+      const res = await api.get('/patients', { params, signal: controller.signal });
+      if (reqId !== requestIdRef.current) return;
+      if (!mountedRef.current) return;
+
+      const payload = res.data?.data;
+      if (payload && !Array.isArray(payload) && Array.isArray(payload.items)) {
+        if (mountedRef.current) {
+          setPatients(payload.items || []);
+          setPatientTotal(typeof payload.total === 'number' ? payload.total : payload.items.length);
+          setPatientPage(payload.page || targetPage);
+        }
+      } else if (Array.isArray(payload)) {
+        const all = payload;
+        if (mountedRef.current) {
+          setPatients(all.slice((targetPage - 1) * usePageSize, (targetPage - 1) * usePageSize + usePageSize));
+          setPatientTotal(all.length);
+          setPatientPage(targetPage);
+        }
+      } else {
+        if (mountedRef.current) {
+          setPatients([]);
+          setPatientTotal(0);
+          setPatientPage(1);
+        }
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      console.error(err);
+      const status = err.response?.status;
+      if (mountedRef.current) {
+        if (status === 401) {
+          setPatientsError('No autorizado. Por favor inicia sesión.');
+          setPatients([]);
+          setSelectedPatient(null);
+          setFormData({ ...formData, patient_id: '' });
+        } else if (status === 403) {
+          setPatientsError('No tienes permisos para listar pacientes.');
+          setPatients([]);
+          setSelectedPatient(null);
+          setFormData({ ...formData, patient_id: '' });
+        } else {
+          setPatientsError(err.response?.data?.message || 'Error al cargar pacientes');
+        }
+      }
+    } finally {
+      if (mountedRef.current) {
+        if (op === 'initial') setInitialPatientsLoading(false);
+        else setPatientsActionLoading(null);
+      }
+      // always clear refs
+      abortControllerRef.current = null;
+      inflightPatientsKeyRef.current = null;
+    }
+  };
+
+  // Clear selection and patient list on auth/org changes to avoid stale cross-tenant data
+  useEffect(() => {
+    setPatients([]);
+    setSelectedPatient(null);
+    setFormData({ ...formData, patient_id: '' });
+    setPatientsError('');
+    setPendingOpPatient('initial');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.organization_id]);
+
+  // debounce search
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setPendingOpPatient('search');
+      setDebouncedPatientQuery(patientQuery);
+      setPatientPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [patientQuery]);
+
+  // Centralized patient fetch trigger
+  useEffect(() => {
+    const op = pendingOpPatient || (initialPatientsLoading ? 'initial' : 'refresh');
+    fetchPatients({ resetPage: false, usePage: patientPage, usePageSize: patientPageSize, op }).catch(() => {});
+    setPendingOpPatient(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedPatientQuery, patientPage, patientPageSize, pendingOpPatient]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -221,11 +403,44 @@ function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) 
           <div className="space-y-4">
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Paciente</label>
-              <select required className="w-full border border-slate-200 rounded p-2.5 text-sm outline-none focus:ring-1 focus:ring-slate-900"
-                value={formData.patient_id} onChange={e => setFormData({...formData, patient_id: e.target.value})}>
-                <option value="">-- Seleccionar --</option>
-                {patients?.map(p => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>)}
-              </select>
+              <div className="flex gap-2 items-center">
+                <input
+                  placeholder="Buscar paciente por nombre o teléfono"
+                  value={patientQuery}
+                  onChange={e => setPatientQuery(e.target.value)}
+                  className="flex-1 border border-slate-200 rounded p-2.5 text-sm outline-none focus:ring-1 focus:ring-slate-900"
+                />
+                <div className="text-xs text-muted">
+                  {patientsActionLoading ? 'Buscando...' : (patientTotal ? `${patientTotal} resultados` : '')}
+                </div>
+              </div>
+
+              <div className="mt-2">
+                {patientsError ? (
+                  <div className="text-sm text-red-600 flex items-center justify-between">
+                    <span>{patientsError}</span>
+                    <button type="button" className="text-sm underline" onClick={() => fetchPatients({ resetPage: false, usePage: patientPage, usePageSize: patientPageSize, op: 'refresh' })}>Reintentar</button>
+                  </div>
+                ) : null}
+
+                <select required className="w-full border border-slate-200 rounded p-2.5 text-sm outline-none focus:ring-1 focus:ring-slate-900 mt-2"
+                  disabled={initialPatientsLoading}
+                  value={formData.patient_id} onChange={e => setFormData({...formData, patient_id: e.target.value})}>
+                  <option value="">-- Seleccionar --</option>
+                  {/* ensure selectedPatient is always present as an option */}
+                  {selectedPatient && !patients.find(p => p.id === selectedPatient.id) ? (
+                    <option key={selectedPatient.id} value={selectedPatient.id}>{selectedPatient.last_name}, {selectedPatient.first_name}</option>
+                  ) : null}
+                  {patients?.map(p => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>)}
+                </select>
+                <div className="mt-2 flex items-center justify-between">
+                  <div className="text-sm text-muted">Mostrando página {patientPage}</div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" disabled={patientPage <= 1 || initialPatientsLoading || patientsActionLoading === 'pagination'} onClick={() => { setPatientPage(p => Math.max(1, p - 1)); setPatientsActionLoading('pagination'); }} className="text-sm px-2 py-1 border rounded">Anterior</button>
+                    <button type="button" disabled={initialPatientsLoading || patientsActionLoading === 'pagination'} onClick={() => { setPatientPage(p => p + 1); setPatientsActionLoading('pagination'); }} className="text-sm px-2 py-1 border rounded">Siguiente</button>
+                  </div>
+                </div>
+              </div>
             </div>
             
             <div className="grid grid-cols-2 gap-4">

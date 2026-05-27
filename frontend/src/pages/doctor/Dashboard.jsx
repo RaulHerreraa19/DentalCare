@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Users, Activity, Clock, ChevronRight } from 'lucide-react';
 import api from '../../lib/axios';
 import { Link } from 'react-router-dom';
@@ -10,38 +10,65 @@ export default function DoctorDashboard() {
     pendingServices: 0
   });
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+  const [patientsLoading, setPatientsLoading] = useState(false);
+  const [patientsError, setPatientsError] = useState('');
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
+    let abortController = null;
     const fetchDashboardData = async () => {
+      abortController = new AbortController();
+      const reqId = ++requestIdRef.current;
       try {
         const today = new Date().toISOString().split('T')[0];
-        
-        // Fetch appointments for today
-        const appointmentsRes = await api.get(`/appointments?start_date=${today}T00:00:00Z&end_date=${today}T23:59:59Z`);
-        
-        // Fetch patients count
-        const patientsRes = await api.get('/patients');
-        
-        setStats({
-          todayAppointments: appointmentsRes.data.data.length,
-          totalPatients: patientsRes.data.data.length,
-          pendingServices: 0 // Placeholder
-        });
 
-        // Get first 3 upcoming ones
+        // Fetch appointments for today (primary)
+        const appointmentsRes = await api.get(`/appointments?start_date=${today}T00:00:00Z&end_date=${today}T23:59:59Z`, { signal: abortController.signal });
+        if (reqId !== requestIdRef.current) return;
+
         setUpcomingAppointments(appointmentsRes.data.data.slice(0, 3));
+        setStats((s) => ({ ...s, todayAppointments: appointmentsRes.data.data.length }));
+
+        // Fetch patients count separately; non-blocking for dashboard render
+        setPatientsError('');
+        setPatientsLoading(true);
+        try {
+          const patientsRes = await api.get('/patients', { params: { mode: 'paginated', page: 1, pageSize: 1 }, signal: abortController.signal });
+          if (reqId !== requestIdRef.current) return;
+          const payload = patientsRes.data?.data;
+          let totalPatientsCount = 0;
+          if (payload && !Array.isArray(payload) && Array.isArray(payload.items)) {
+            totalPatientsCount = typeof payload.total === 'number' ? payload.total : payload.items.length;
+          } else if (Array.isArray(payload)) {
+            totalPatientsCount = payload.length;
+          }
+          setStats((s) => ({ ...s, totalPatients: totalPatientsCount }));
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.error('Error fetching patients count:', err);
+          setPatientsError(err.response?.data?.message || 'No se pudo cargar el conteo de pacientes');
+          setStats((s) => ({ ...s, totalPatients: null }));
+        } finally {
+          setPatientsLoading(false);
+        }
       } catch (error) {
+        if (error.name === 'AbortError') return;
         console.error('Error fetching dashboard data:', error);
       } finally {
-        setLoading(false);
+        setAppointmentsLoading(false);
       }
     };
-
     fetchDashboardData();
+
+    return () => {
+      if (abortController) abortController.abort();
+      // bump reqIdRef to invalidate in-flight handlers
+      requestIdRef.current++;
+    };
   }, []);
 
-  if (loading) return <div className="p-8">Cargando dashboard...</div>;
+  if (appointmentsLoading) return <div className="p-8">Cargando dashboard...</div>;
 
   return (
     <div className="space-y-8">
@@ -68,7 +95,8 @@ export default function DoctorDashboard() {
           </div>
           <div>
             <p className="text-sm text-gray-500 font-medium">Pacientes Totales</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalPatients}</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.totalPatients ?? '—'}</p>
+            {patientsError ? <p className="text-xs text-red-600 mt-1">{patientsError}</p> : null}
           </div>
         </div>
 
