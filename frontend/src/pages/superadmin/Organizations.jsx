@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building, Plus, Search, ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Building2, Plus, Search } from 'lucide-react';
 import api from '../../lib/axios';
+import { Button, Card, DataTable, EmptyState, Input, SectionHeader } from '../../components/ui';
 
 export default function Organizations() {
   const [organizations, setOrganizations] = useState([]);
@@ -23,98 +24,135 @@ export default function Organizations() {
     }
   };
 
-  const filteredOrgs = organizations.filter(org => 
-    org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    org.slug.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrgs = organizations.filter((org) => {
+    const query = searchTerm.trim().toLowerCase();
+    return (
+      org.name.toLowerCase().includes(query) ||
+      org.slug.toLowerCase().includes(query)
+    );
+  });
 
-  if (loading) return <div className="p-8">Cargando negocios...</div>;
+  const planStyles = {
+    ENTERPRISE: 'bg-accent-50 text-accent-600 border-accent-100',
+    PREMIUM: 'bg-primary-50 text-primary-600 border-primary-100',
+    DEFAULT: 'bg-surface-muted text-muted border-border',
+  };
+
+  if (loading) {
+    return (
+      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
+        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
+          <Building2 className="h-5 w-5 animate-pulse text-primary-600" />
+          Cargando negocios...
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Negocios</h1>
-          <p className="text-gray-500">Administra todas las clínicas y organizaciones en la plataforma.</p>
-        </div>
-        <Link
-          to="/superadmin/organizations/new"
-          className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Negocio
-        </Link>
-      </div>
-
-      {/* Filters & Search */}
-      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center">
-        <div className="relative flex-1 max-w-md">
-          <Search className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="Buscar por nombre o identificador..." 
-            className="pl-10 pr-4 py-2 w-full border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* Organizations List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredOrgs.map((org) => (
-          <div key={org.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-primary-50 rounded-xl">
-                  <Building className="h-6 w-6 text-primary-600" />
-                </div>
-                <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-                  org.plan === 'ENTERPRISE' ? 'bg-purple-100 text-purple-700' : 
-                  org.plan === 'PREMIUM' ? 'bg-primary-100 text-primary-700' : 
-                  'bg-gray-100 text-gray-700'
-                }`}>
-                  Plan {org.plan}
-                </span>
-              </div>
-              
-              <h2 className="text-lg font-bold text-gray-900 mb-1">{org.name}</h2>
-              <p className="text-sm text-gray-500 mb-4">@{org.slug}</p>
-              
-              <div className="flex items-center text-sm text-gray-600 space-x-6 mb-6">
-                <div>
-                  <span className="block font-bold text-gray-900">{org._count?.clinics || 0}</span>
-                  <span className="text-xs uppercase text-gray-400">Sucursales</span>
-                </div>
-                <div>
-                  <span className="block font-bold text-gray-900">{org._count?.users || 0}</span>
-                  <span className="text-xs uppercase text-gray-400">Usuarios</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                <div className="flex items-center">
-                   <div className={`h-2 w-2 rounded-full mr-2 ${org.is_active ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                   <span className="text-xs font-medium text-gray-600">{org.is_active ? 'Activo' : 'Inactivo'}</span>
-                </div>
-                <Link 
-                  to={`/superadmin/organizations/${org.id}`}
-                  className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                >
-                  <ArrowUpRight className="h-5 w-5" />
-                </Link>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {filteredOrgs.length === 0 && (
-          <div className="col-span-full py-20 text-center">
-            <Building className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-            <p className="text-gray-400 font-medium">No se encontraron negocios con esos criterios.</p>
-          </div>
+    <div className="mx-auto max-w-7xl space-y-section px-layout py-layout animate-in fade-in duration-500">
+      <SectionHeader
+        eyebrow="Superadministración"
+        title="Gestión de negocios"
+        description="Administra todas las organizaciones y clínicas de la plataforma desde una vista de lectura rápida."
+        actions={(
+          <Button as={Link} to="/superadmin/organizations/new" size="sm">
+            <Plus className="h-4 w-4" />
+            Nuevo negocio
+          </Button>
         )}
-      </div>
+      />
+
+      <Card className="p-4 md:p-6">
+        <Input
+          label="Buscar negocios"
+          placeholder="Buscar por nombre o identificador..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          prefix={<Search className="h-4 w-4" />}
+          containerClassName="max-w-xl"
+        />
+      </Card>
+
+      <Card className="overflow-hidden">
+        <div className="border-b border-border bg-surface-muted px-6 py-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div className="space-y-1">
+              <p className="text-label text-muted">Listado consolidado</p>
+              <h2 className="text-section-title text-ink">Organizaciones registradas</h2>
+              <p className="text-body text-muted">Vista optimizada para revisar plan, actividad y alcance operativo.</p>
+            </div>
+            <span className="text-caption uppercase tracking-[0.16em] text-muted">
+              {filteredOrgs.length} registros
+            </span>
+          </div>
+        </div>
+
+        <DataTable
+          emptyState={(
+            <EmptyState
+              icon={Building2}
+              title="No se encontraron negocios"
+              description="Ajusta el filtro para localizar una organización por nombre o slug."
+            />
+          )}
+        >
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-surface">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Negocio</th>
+                <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Slug</th>
+                <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Plan</th>
+                <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Sucursales</th>
+                <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Usuarios</th>
+                <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Estado</th>
+                <th scope="col" className="px-6 py-3 text-right text-caption uppercase tracking-[0.14em] text-muted">Acción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-surface">
+              {filteredOrgs.map((org) => {
+                const planTone = planStyles[org.plan] || planStyles.DEFAULT;
+
+                return (
+                  <tr key={org.id} className="transition-colors hover:bg-surface-muted/60">
+                    <td className="px-6 py-4 align-top">
+                      <div className="flex items-start gap-3">
+                        <div className="rounded-panel bg-primary-50 p-2.5 text-primary-600">
+                          <Building2 className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 space-y-1">
+                          <div className="text-sm font-medium text-ink">{org.name}</div>
+                          <div className="text-xs text-muted">Identificador operativo</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 align-top text-sm text-muted">@{org.slug}</td>
+                    <td className="px-6 py-4 align-top">
+                      <span className={`inline-flex items-center rounded-control border px-3 py-1 text-caption ${planTone}`}>
+                        {org.plan}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 align-top text-sm text-ink">{org._count?.clinics || 0}</td>
+                    <td className="px-6 py-4 align-top text-sm text-ink">{org._count?.users || 0}</td>
+                    <td className="px-6 py-4 align-top">
+                      <span className="inline-flex items-center gap-2 text-sm text-muted">
+                        <span className={`h-2.5 w-2.5 rounded-full ${org.is_active ? 'bg-success-600' : 'bg-danger-600'}`} />
+                        {org.is_active ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 align-top text-right">
+                      <Button as={Link} to={`/superadmin/organizations/${org.id}`} variant="secondary" size="sm">
+                        <ArrowUpRight className="h-4 w-4" />
+                        Ver detalle
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </DataTable>
+      </Card>
     </div>
   );
 }

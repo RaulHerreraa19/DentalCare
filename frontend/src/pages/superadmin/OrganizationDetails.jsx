@@ -1,20 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Building, 
-  Users, 
-  ArrowLeft, 
-  Settings, 
-  LayoutDashboard,
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Building2,
   CheckCircle,
-  XCircle,
   Clock,
   ExternalLink,
+  LayoutDashboard,
+  Settings,
   Shield,
   Stethoscope,
-  UserCheck
+  UserCheck,
+  Users,
+  XCircle,
 } from 'lucide-react';
 import api from '../../lib/axios';
+import {
+  Button,
+  Card,
+  DataTable,
+  EmptyState,
+  KPIStatCard,
+  SectionHeader,
+} from '../../components/ui';
+
+function formatDate(value) {
+  if (!value) return '---';
+  return new Date(value).toLocaleDateString('es-MX');
+}
 
 export default function OrganizationDetails() {
   const { id } = useParams();
@@ -37,152 +50,267 @@ export default function OrganizationDetails() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Cargando detalles del negocio...</div>;
-  if (!org) return <div className="p-8 text-center text-red-500 font-bold">Error: Negocio no encontrado.</div>;
+  if (loading) {
+    return (
+      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
+        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
+          <LayoutDashboard className="h-5 w-5 animate-pulse text-primary-600" />
+          Cargando detalles del negocio...
+        </Card>
+      </div>
+    );
+  }
+
+  if (!org) {
+    return (
+      <div className="mx-auto max-w-3xl px-layout py-layout">
+        <EmptyState
+          icon={XCircle}
+          title="Negocio no encontrado"
+          description="No fue posible cargar la organización solicitada. Verifica que el identificador sea correcto."
+          action={(
+            <Button as={Link} to="/superadmin/organizations" variant="secondary">
+              Volver a negocios
+            </Button>
+          )}
+        />
+      </div>
+    );
+  }
+
+  const clinicCount = org._count?.clinics || 0;
+  const userCount = org._count?.users || 0;
+  const patientCount = org._count?.patients || 0;
+  const isActive = Boolean(org.is_active);
+  const statusLabel = isActive ? 'Activo' : 'Suspendido';
+  const hasClinics = (org.clinics?.length || 0) > 0;
+  const hasUsers = (org.users?.length || 0) > 0;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <button 
-            onClick={() => navigate('/superadmin/organizations')}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-gray-900"
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </button>
-          <div>
-            <div className="flex items-center space-x-3 mb-1">
-              <h1 className="text-2xl font-bold text-gray-900">{org.name}</h1>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                org.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-              }`}>
-                {org.is_active ? 'Activo' : 'Suspendido'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-500 italic">Identificador único: {org.slug}</p>
+    <div className="mx-auto max-w-7xl space-y-section px-layout py-layout animate-in fade-in duration-500">
+      <SectionHeader
+        eyebrow="Superadministración"
+        title={org.name}
+        description={`Identificador único: @${org.slug} · Registrado el ${formatDate(org.created_at)}`}
+        actions={(
+          <div className="flex flex-wrap items-center gap-3">
+            <Button as={Link} to="/superadmin/organizations" variant="secondary" size="sm">
+              <ArrowLeft className="h-4 w-4" />
+              Volver a negocios
+            </Button>
+            <Button variant="secondary" size="sm">
+              <Settings className="h-4 w-4" />
+              Configuración
+            </Button>
+            <Button size="sm">
+              <Shield className="h-4 w-4" />
+              Cambiar plan
+            </Button>
           </div>
-        </div>
+        )}
+      />
 
-        <div className="flex items-center space-x-3">
-          <button className="flex items-center px-4 py-2 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
-            <Settings className="h-4 w-4 mr-2" />
-            Configuración
-          </button>
-          <button className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200">
-            <Shield className="h-4 w-4 mr-2" />
-            Cambiar Plan
-          </button>
-        </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KPIStatCard
+          title="Plan actual"
+          value={org.plan}
+          icon={LayoutDashboard}
+          tone="primary"
+          footer="Suscripción vigente"
+        />
+        <KPIStatCard
+          title="Sucursales"
+          value={clinicCount}
+          icon={Building2}
+          tone="accent"
+          footer="Clínicas registradas"
+        />
+        <KPIStatCard
+          title="Personal total"
+          value={userCount}
+          icon={Users}
+          tone="success"
+          footer="Usuarios asignados"
+        />
+        <KPIStatCard
+          title="Pacientes"
+          value={patientCount}
+          icon={UserCheck}
+          tone="danger"
+          footer="Pacientes vinculados"
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Sidebar Info */}
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6 border-b border-gray-50 pb-3">Resumen General</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-500">Plan Actual</span>
-                <span className="text-sm font-black text-primary-600 bg-primary-50 px-2 py-1 rounded">{org.plan}</span>
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="space-y-section">
+          <Card className="p-6">
+            <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+              <div className="space-y-1">
+                <p className="text-label text-muted">Resumen general</p>
+                <h2 className="text-section-title text-ink">Estado operativo</h2>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500">Fecha Registro</span>
-                <span className="text-gray-900 font-bold">{new Date(org.created_at).toLocaleDateString()}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500">Sucursales</span>
-                <span className="text-gray-900 font-bold">{org._count?.clinics || 0}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500">Total Personal</span>
-                <span className="text-gray-900 font-bold">{org._count?.users || 0}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500">Pacientes</span>
-                <span className="text-gray-900 font-bold">{org._count?.patients || 0}</span>
-              </div>
+              <span className={`inline-flex items-center gap-2 rounded-control border px-3 py-1 text-caption ${isActive ? 'border-success-100 bg-success-50 text-success-600' : 'border-danger-100 bg-danger-50 text-danger-600'}`}>
+                <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-success-600' : 'bg-danger-600'}`} />
+                {statusLabel}
+              </span>
             </div>
-          </div>
 
-          <div className="bg-gradient-to-br from-indigo-600 to-primary-700 p-6 rounded-3xl shadow-lg text-white">
-            <LayoutDashboard className="h-8 w-8 mb-4 opacity-50" />
-            <h4 className="text-lg font-bold mb-2">Salud del Negocio</h4>
-            <p className="text-white/70 text-sm mb-6">Este cliente ha mantenido su suscripción activa durante el último año sin incidentes.</p>
-            <div className="flex items-center text-xs font-black uppercase tracking-widest bg-white/10 px-3 py-2 rounded-xl border border-white/20">
-               <CheckCircle className="h-3 w-3 mr-2 text-green-300" />
-               Suscripción OK
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted">Plan actual</span>
+                <span className="font-medium text-ink">{org.plan}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted">Fecha de registro</span>
+                <span className="font-medium text-ink">{formatDate(org.created_at)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted">Sucursales</span>
+                <span className="font-medium text-ink">{clinicCount}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted">Personal total</span>
+                <span className="font-medium text-ink">{userCount}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted">Pacientes</span>
+                <span className="font-medium text-ink">{patientCount}</span>
+              </div>
             </div>
-          </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-start gap-3">
+              <div className="rounded-panel bg-primary-50 p-2 text-primary-600">
+                <CheckCircle className="h-5 w-5" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-label text-muted">Salud del negocio</p>
+                <h3 className="text-section-title text-ink">Suscripción OK</h3>
+                <p className="text-body text-muted">
+                  Este cliente ha mantenido su suscripción activa durante el último año sin incidentes.
+                </p>
+              </div>
+            </div>
+          </Card>
         </div>
 
-        {/* Clinics & Users Tabs (Simplified version) */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Clinics Section */}
-          <section>
-            <div className="flex items-center space-x-2 mb-4">
-              <Building className="h-5 w-5 text-gray-400" />
-              <h2 className="text-lg font-bold text-gray-900">Sucursales y Clínicas</h2>
+        <div className="space-y-section">
+          <Card className="overflow-hidden">
+            <div className="border-b border-border bg-surface-muted px-6 py-5">
+              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-ink">
+                <Building2 className="h-4 w-4" />
+                Sucursales y clínicas
+              </div>
+              <p className="mt-1 text-body text-muted">Información consolidada por ubicación operativa.</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {org.clinics?.map(clinic => (
-                <div key={clinic.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:border-primary-200 transition-all group">
-                  <div className="flex justify-between items-start mb-3">
-                    <h5 className="font-bold text-gray-900 group-hover:text-primary-600 transition-colors">{clinic.name}</h5>
-                    <ExternalLink className="h-4 w-4 text-gray-300 group-hover:text-primary-400" />
-                  </div>
-                  <div className="space-y-2 text-sm text-gray-500">
-                    <p className="flex items-center"><Clock className="h-3 w-3 mr-2" /> {clinic.address || 'Sin dirección'}</p>
-                    <div className="flex space-x-4 pt-2 border-t border-gray-50 mt-4">
-                      <span className="text-[10px] font-bold uppercase tracking-widest">{clinic._count?.offices} Consultorios</span>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary-600">{clinic._count?.appointments} Citas Totales</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
 
-          {/* Staff Section */}
-          <section>
-             <div className="flex items-center space-x-2 mb-4 pt-4">
-              <Users className="h-5 w-5 text-gray-400" />
-              <h2 className="text-lg font-bold text-gray-900">Equipo de Trabajo</h2>
+            <DataTable>
+              {hasClinics ? (
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-surface">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Sucursal</th>
+                      <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Dirección</th>
+                      <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Consultorios</th>
+                      <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Citas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border bg-surface">
+                    {org.clinics?.map((clinic) => (
+                      <tr key={clinic.id} className="transition-colors hover:bg-surface-muted/60">
+                        <td className="px-6 py-4 align-top">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-panel bg-primary-50 p-2 text-primary-600">
+                              <Building2 className="h-4 w-4" />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium text-ink">{clinic.name}</div>
+                              <div className="text-xs text-muted">Ubicación clínica</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 align-top text-sm text-muted">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 flex-none text-muted" />
+                            <span>{clinic.address || 'Sin dirección'}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 align-top text-sm text-ink">{clinic._count?.offices || 0}</td>
+                        <td className="px-6 py-4 align-top text-sm text-ink">{clinic._count?.appointments || 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <EmptyState
+                  icon={Building2}
+                  title="No hay sucursales registradas"
+                  description="Cuando la organización tenga clínicas activas, aparecerán aquí con su dirección y métricas base."
+                  className="m-6"
+                />
+              )}
+            </DataTable>
+          </Card>
+
+          <Card className="overflow-hidden">
+            <div className="border-b border-border bg-surface-muted px-6 py-5">
+              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-ink">
+                <Users className="h-4 w-4" />
+                Equipo de trabajo
+              </div>
+              <p className="mt-1 text-body text-muted">Roles, estado y contacto del personal asignado.</p>
             </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-               <table className="w-full text-left">
-                 <thead className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                   <tr>
-                     <th className="px-6 py-4">Nombre</th>
-                     <th className="px-6 py-4">Rol</th>
-                     <th className="px-6 py-4">Estado</th>
-                     <th className="px-6 py-4 text-right">Contacto</th>
-                   </tr>
-                 </thead>
-                 <tbody className="divide-y divide-gray-50 text-sm">
-                   {org.users?.map(user => (
-                     <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                       <td className="px-6 py-4 font-bold text-gray-900">{user.first_name} {user.last_name}</td>
-                       <td className="px-6 py-4 text-gray-500">
-                         <span className="flex items-center">
-                           {user.role === 'DOCTOR' ? <Stethoscope className="h-3 w-3 mr-1.5" /> : <UserCheck className="h-3 w-3 mr-1.5" />}
-                           {user.role}
-                         </span>
-                       </td>
-                       <td className="px-6 py-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            user.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                          }`}>
-                            {user.is_active ? 'Si' : 'No'}
+
+            <DataTable>
+              {hasUsers ? (
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-surface">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Nombre</th>
+                      <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Rol</th>
+                      <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Estado</th>
+                      <th scope="col" className="px-6 py-3 text-right text-caption uppercase tracking-[0.14em] text-muted">Contacto</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border bg-surface">
+                    {org.users?.map((user) => (
+                      <tr key={user.id} className="transition-colors hover:bg-surface-muted/60">
+                        <td className="px-6 py-4 align-top font-medium text-ink">
+                          {user.first_name} {user.last_name}
+                        </td>
+                        <td className="px-6 py-4 align-top text-sm text-muted">
+                          <span className="inline-flex items-center gap-1.5">
+                            {user.role === 'DOCTOR' ? (
+                              <Stethoscope className="h-4 w-4" />
+                            ) : (
+                              <UserCheck className="h-4 w-4" />
+                            )}
+                            {user.role}
                           </span>
-                       </td>
-                       <td className="px-6 py-4 text-right italic text-gray-400">{user.email}</td>
-                     </tr>
-                   ))}
-                 </tbody>
-               </table>
-            </div>
-          </section>
+                        </td>
+                        <td className="px-6 py-4 align-top">
+                          <span className={`inline-flex items-center rounded-control border px-3 py-1 text-caption ${user.is_active ? 'border-success-100 bg-success-50 text-success-600' : 'border-danger-100 bg-danger-50 text-danger-600'}`}>
+                            {user.is_active ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 align-top text-right text-sm text-muted">
+                          {user.email}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <EmptyState
+                  icon={Users}
+                  title="No hay usuarios asignados"
+                  description="Cuando se agregue personal a la organización, el equipo aparecerá aquí con su rol y estado."
+                  className="m-6"
+                />
+              )}
+            </DataTable>
+          </Card>
         </div>
       </div>
     </div>

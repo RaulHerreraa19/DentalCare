@@ -73,7 +73,7 @@ export default function OrganizationCreate() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 px-layout py-layout">
+    <div className="mx-auto max-w-5xl space-y-section px-layout py-layout animate-in fade-in duration-500">
       <SectionHeader
         eyebrow="Super Admin"
         title="Crear nuevo negocio"
@@ -89,9 +89,9 @@ export default function OrganizationCreate() {
         )}
       />
 
-      <Card>
-        <div className="px-6 py-5 border-b border-border bg-surface-muted flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-primary-50 text-primary-600">
+      <Card className="overflow-hidden">
+        <div className="flex items-center gap-3 border-b border-border bg-surface-muted px-6 py-5">
+          <div className="rounded-panel bg-primary-50 p-2 text-primary-600">
             <Building2 className="h-5 w-5" />
           </div>
           <div>
@@ -101,62 +101,68 @@ export default function OrganizationCreate() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
-            <Input
-              label="Nombre del negocio"
-              required
-              placeholder="DentalCare Centro"
-              value={form.name}
-              onChange={updateField('name')}
-            />
+          <div className="space-y-section p-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <Input
+                label="Nombre del negocio"
+                required
+                placeholder="DentalCare Centro"
+                value={form.name}
+                onChange={updateField('name')}
+              />
 
-            <Input
-              label="Slug / identificador"
-              required
-              placeholder="dentalcare-centro"
-              value={form.slug}
-              onChange={updateField('slug')}
-              prefix={<Hash className="h-4 w-4" />}
-            />
+              <Input
+                label="Slug / identificador"
+                required
+                placeholder="dentalcare-centro"
+                value={form.slug}
+                onChange={updateField('slug')}
+                prefix={<Hash className="h-4 w-4" />}
+              />
+            </div>
 
-            <Input
-              label="Nombre del dueño"
-              required
-              placeholder="Ana"
-              value={form.owner_first_name}
-              onChange={updateField('owner_first_name')}
-              prefix={<UserPlus className="h-4 w-4" />}
-            />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <Input
+                label="Nombre del dueño"
+                required
+                placeholder="Ana"
+                value={form.owner_first_name}
+                onChange={updateField('owner_first_name')}
+                prefix={<UserPlus className="h-4 w-4" />}
+              />
 
-            <Input
-              label="Apellido del dueño"
-              required
-              placeholder="García"
-              value={form.owner_last_name}
-              onChange={updateField('owner_last_name')}
-              prefix={<UserPlus className="h-4 w-4" />}
-            />
+              <Input
+                label="Apellido del dueño"
+                required
+                placeholder="García"
+                value={form.owner_last_name}
+                onChange={updateField('owner_last_name')}
+                prefix={<UserPlus className="h-4 w-4" />}
+              />
+            </div>
 
-            <Input
-              label="Correo del dueño"
-              required
-              type="email"
-              placeholder="dueno@negocio.com"
-              value={form.owner_email}
-              onChange={updateField('owner_email')}
-              prefix={<Mail className="h-4 w-4" />}
-            />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <Input
+                label="Correo del dueño"
+                required
+                type="email"
+                placeholder="dueno@negocio.com"
+                value={form.owner_email}
+                onChange={updateField('owner_email')}
+                prefix={<Mail className="h-4 w-4" />}
+              />
 
-            <Input
-              label="Contraseña"
-              required
-              type="password"
-              minLength={8}
-              placeholder="Mínimo 8 caracteres"
-              value={form.owner_password}
-              onChange={updateField('owner_password')}
-              prefix={<KeyRound className="h-4 w-4" />}
-            />
+              <Input
+                label="Contraseña"
+                required
+                type="password"
+                minLength={8}
+                placeholder="Mínimo 8 caracteres"
+                value={form.owner_password}
+                onChange={updateField('owner_password')}
+                prefix={<KeyRound className="h-4 w-4" />}
+              />
+            </div>
 
             <Input
               label="Confirmar contraseña"
@@ -167,10 +173,11 @@ export default function OrganizationCreate() {
               value={form.confirm_password}
               onChange={updateField('confirm_password')}
               prefix={<KeyRound className="h-4 w-4" />}
+              containerClassName="max-w-xl"
             />
           </div>
 
-          <div className="px-6 py-4 border-t border-border bg-surface-muted flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-3 border-t border-border bg-surface-muted px-6 py-4">
             <Button as={Link} to="/superadmin/organizations" variant="secondary">
               Cancelar
             </Button>
