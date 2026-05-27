@@ -333,7 +333,7 @@ export default function OwnerTeam() {
                   value={formData.role}
                   onChange={(event) => setFormData({ ...formData, role: event.target.value, office_ids: [] })}
                 >
-                  <option value="DOCTOR">Médico especialista</option>
+                  <option value="DOCTOR">Médico</option>
                   <option value="RECEPTIONIST">Personal de recepción</option>
                 </SelectControl>
 
