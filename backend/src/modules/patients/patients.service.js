@@ -8,6 +8,12 @@ const {
 } = require("../../utils/validators");
 
 const VALID_GENDERS = ["M", "F", "O", "OTHER"];
+const DEFAULT_LEGACY_TAKE = 50;
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+const VALID_MODES = ["legacy", "paginated"];
+const VALID_SORT_FIELDS = ["created_at", "first_name", "last_name"];
+const VALID_SORT_DIRECTIONS = ["asc", "desc"];
 
 const normalizeGender = (gender) => {
   if (gender === undefined) return undefined;
@@ -23,6 +29,106 @@ const normalizeGender = (gender) => {
 };
 
 class PatientsService {
+  static hasPaginationParamsInLegacyQuery(rawQuery = {}) {
+    return (
+      rawQuery.page !== undefined ||
+      rawQuery.pageSize !== undefined ||
+      rawQuery.page_size !== undefined ||
+      rawQuery.sortBy !== undefined ||
+      rawQuery.sortDir !== undefined
+    );
+  }
+
+  static buildSearchWhere(searchTerm) {
+    if (!searchTerm) return undefined;
+
+    return [
+      { first_name: { contains: searchTerm, mode: "insensitive" } },
+      { last_name: { contains: searchTerm, mode: "insensitive" } },
+      { phone: { contains: searchTerm, mode: "insensitive" } },
+      { email: { contains: searchTerm, mode: "insensitive" } },
+    ];
+  }
+
+  static parseListQuery(rawQuery = {}) {
+    const rawMode =
+      rawQuery.mode === undefined || rawQuery.mode === null
+        ? "legacy"
+        : String(rawQuery.mode).trim().toLowerCase();
+
+    if (!VALID_MODES.includes(rawMode)) {
+      throw new AppError(
+        "Parámetro mode inválido. Usa 'legacy' o 'paginated'.",
+        400,
+      );
+    }
+
+    const normalizedSearch = String(rawQuery.q ?? rawQuery.search ?? "").trim();
+
+    if (rawMode === "legacy") {
+      return {
+        mode: "legacy",
+        search: normalizedSearch,
+        hasIgnoredPaginationParams:
+          PatientsService.hasPaginationParamsInLegacyQuery(rawQuery),
+      };
+    }
+
+    const rawPage = rawQuery.page ?? "1";
+    const parsedPage = Number(rawPage);
+    if (!Number.isInteger(parsedPage) || parsedPage < 1) {
+      throw new AppError(
+        "El parámetro page debe ser un entero mayor o igual a 1.",
+        400,
+      );
+    }
+
+    const rawPageSize =
+      rawQuery.pageSize ?? rawQuery.page_size ?? DEFAULT_PAGE_SIZE;
+    const parsedPageSize = Number(rawPageSize);
+    if (!Number.isInteger(parsedPageSize) || parsedPageSize < 1) {
+      throw new AppError(
+        "El parámetro pageSize debe ser un entero mayor o igual a 1.",
+        400,
+      );
+    }
+
+    const pageSize = Math.min(parsedPageSize, MAX_PAGE_SIZE);
+
+    const sortBy = String(rawQuery.sortBy ?? "created_at")
+      .trim()
+      .toLowerCase();
+    if (!VALID_SORT_FIELDS.includes(sortBy)) {
+      throw new AppError(
+        "El parámetro sortBy no es válido. Usa created_at, first_name o last_name.",
+        400,
+      );
+    }
+
+    const sortDir = String(rawQuery.sortDir ?? "desc")
+      .trim()
+      .toLowerCase();
+    if (!VALID_SORT_DIRECTIONS.includes(sortDir)) {
+      throw new AppError(
+        "El parámetro sortDir no es válido. Usa asc o desc.",
+        400,
+      );
+    }
+
+    return {
+      mode: "paginated",
+      search: normalizedSearch,
+      page: parsedPage,
+      pageSize,
+      sortBy,
+      sortDir,
+      skip: (parsedPage - 1) * pageSize,
+      take: pageSize,
+      // Tie-break with id to keep deterministic ordering across pages.
+      orderBy: [{ [sortBy]: sortDir }, { id: sortDir }],
+    };
+  }
+
   static async createPatient(organizationId, data) {
     const safeFirstName = assertRequiredText(
       data.first_name,
@@ -73,22 +179,74 @@ class PatientsService {
     });
   }
 
-  static async getPatients(organizationId, search = "") {
-    const whereClause = { organization_id: organizationId };
-    if (search) {
-      whereClause.OR = [
-        { first_name: { contains: search, mode: "insensitive" } },
-        { last_name: { contains: search, mode: "insensitive" } },
-        { phone: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
-      ];
+  static async getPatients(organizationId, rawQuery = {}) {
+    const query = PatientsService.parseListQuery(rawQuery);
+    const whereClause = {
+      organization_id: organizationId,
+    };
+
+    const searchWhere = PatientsService.buildSearchWhere(query.search);
+    if (searchWhere) {
+      whereClause.OR = searchWhere;
     }
 
-    return await db.patient.findMany({
-      where: whereClause,
-      orderBy: { created_at: "desc" },
-      take: 50, // Límite para evitar query gigante
-    });
+    if (query.mode === "legacy") {
+      const items = await db.patient.findMany({
+        where: whereClause,
+        orderBy: [{ created_at: "desc" }, { id: "desc" }],
+        take: DEFAULT_LEGACY_TAKE,
+      });
+
+      return {
+        mode: "legacy",
+        data: items,
+        telemetry: {
+          search: query.search,
+          returnedItems: items.length,
+          limitedByLegacyCap: items.length === DEFAULT_LEGACY_TAKE,
+          ignoredPaginationParams: query.hasIgnoredPaginationParams,
+        },
+      };
+    }
+
+    const [items, total] = await db.$transaction([
+      db.patient.findMany({
+        where: whereClause,
+        orderBy: query.orderBy,
+        skip: query.skip,
+        take: query.take,
+      }),
+      db.patient.count({ where: whereClause }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
+    const isOutOfRange = total > 0 && query.page > totalPages;
+
+    return {
+      mode: "paginated",
+      data: {
+        items,
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages,
+        hasNext: query.page < totalPages,
+        hasPrev: total > 0 && query.page > 1,
+        isOutOfRange,
+        appliedFilters: {
+          q: query.search,
+          sortBy: query.sortBy,
+          sortDir: query.sortDir,
+        },
+      },
+      telemetry: {
+        search: query.search,
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        returnedItems: items.length,
+      },
+    };
   }
 
   static async getPatientById(organizationId, patientId) {

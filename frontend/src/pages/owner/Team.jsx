@@ -449,6 +449,7 @@ export default function OwnerTeam() {
 
         <DataTable
           loading={loading && employees.length > 0}
+          isEmpty={employees.length === 0}
           emptyState={(
             <EmptyState
               icon={Shield}

@@ -220,6 +220,7 @@ model Patient {
   prescriptions     Prescription[]
   consents          Consent[]
 
+  @@index([organization_id, created_at], map: "patients_organization_id_created_at_idx")
   @@map("patients")
 }
 

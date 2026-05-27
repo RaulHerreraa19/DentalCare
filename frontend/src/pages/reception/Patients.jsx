@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import api from '../../lib/axios';
 import { FileText, Mail, Phone, Search, UserPlus } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -33,8 +33,17 @@ export default function Patients() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef(null);
   
   const [formData, setFormData] = useState({
     first_name: '',
@@ -47,28 +56,97 @@ export default function Patients() {
   });
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, pageSize]);
+
+  useEffect(() => {
+    const fetchPatients = async () => {
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
+
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      try {
+        setLoading(true);
+        setErrorMessage('');
+
+        const res = await api.get('/patients', {
+          params: {
+            mode: 'paginated',
+            q: debouncedSearch,
+            page,
+            pageSize,
+            sortBy: 'created_at',
+            sortDir: 'desc',
+          },
+          signal: controller.signal,
+        });
+
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        const responseData = res.data?.data;
+
+        // Reversible fallback: if backend returns legacy array shape, page locally.
+        if (Array.isArray(responseData)) {
+          const fallbackTotal = responseData.length;
+          const fallbackStart = (page - 1) * pageSize;
+          setPatients(responseData.slice(fallbackStart, fallbackStart + pageSize));
+          setTotal(fallbackTotal);
+          setTotalPages(Math.max(1, Math.ceil(fallbackTotal / pageSize)));
+          return;
+        }
+
+        const nextItems = responseData?.items || [];
+        setPatients(nextItems);
+        setTotal(Number(responseData?.total || 0));
+        setTotalPages(Math.max(1, Number(responseData?.totalPages || 1)));
+      } catch (error) {
+        if (controller.signal.aborted || requestId !== requestIdRef.current) {
+          return;
+        }
+
+        setErrorMessage(
+          error.response?.data?.message ||
+            'No se pudo cargar el directorio de pacientes. Intenta nuevamente.',
+        );
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+        }
+      }
+    };
+
     fetchPatients();
-  }, []);
 
-  const filteredPatients = useMemo(() => {
-    const normalizedSearch = searchTerm.toLowerCase();
+    return () => {
+      controllerCleanup();
+    };
+  }, [debouncedSearch, page, pageSize, reloadKey]);
 
-    return patients.filter((patient) => {
-      const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
-      return fullName.includes(normalizedSearch) || patient.phone?.includes(searchTerm);
-    });
-  }, [patients, searchTerm]);
+  const controllerCleanup = () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+  };
 
-  const fetchPatients = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/patients');
-      setPatients(res.data.data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
+  const refreshPatients = ({ resetPage = false } = {}) => {
+    if (resetPage) {
+      setPage(1);
     }
+    setReloadKey((prev) => prev + 1);
   };
 
   const handleCreate = async (e) => {
@@ -109,8 +187,9 @@ export default function Patients() {
         confirmButtonColor: '#0f172a',
         timer: 2000
       });
-      fetchPatients();
+      refreshPatients({ resetPage: true });
       setFormData({ first_name: '', last_name: '', phone: '', email: '', date_of_birth: '', gender: '', address: '' });
+      setShowModal(false);
     } catch (error) {
       Swal.fire({
         icon: 'error',
@@ -137,14 +216,14 @@ export default function Patients() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         <KPIStatCard
           title="Pacientes registrados"
-          value={patients.length}
+          value={total}
           tone="primary"
           badge="Total"
           footer="Base clínica"
         />
         <KPIStatCard
           title="Resultados visibles"
-          value={filteredPatients.length}
+          value={patients.length}
           tone="accent"
           badge="Filtrados"
           footer="Búsqueda activa"
@@ -162,8 +241,18 @@ export default function Patients() {
         />
       </Card>
 
+      {errorMessage ? (
+        <Card className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm text-danger-600">{errorMessage}</p>
+          <Button variant="secondary" size="sm" onClick={() => refreshPatients()}>
+            Reintentar
+          </Button>
+        </Card>
+      ) : null}
+
       <DataTable
         loading={loading}
+        isEmpty={!loading && patients.length === 0}
         emptyState={(
           <EmptyState
             icon={Search}
@@ -190,7 +279,7 @@ export default function Patients() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-surface">
-            {filteredPatients.map((patient) => (
+            {patients.map((patient) => (
               <tr key={patient.id} className="hover:bg-surface-muted/60 transition-colors">
                 <td className="px-6 py-5 align-top">
                   <div className="flex items-center gap-3">
@@ -240,6 +329,46 @@ export default function Patients() {
           </tbody>
         </table>
       </DataTable>
+
+      <Card className="p-4 md:p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <p className="text-sm text-muted">
+            Página {page} de {totalPages} · {patients.length} visibles de {total} totales
+          </p>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <SelectControl
+              label="Filas por página"
+              value={String(pageSize)}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              containerClassName="min-w-[160px]"
+            >
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </SelectControl>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={loading || page <= 1}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={loading || page >= totalPages}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Modal
         open={showModal}

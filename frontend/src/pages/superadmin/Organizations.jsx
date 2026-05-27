@@ -89,6 +89,7 @@ export default function Organizations() {
         </div>
 
         <DataTable
+          isEmpty={filteredOrgs.length === 0}
           emptyState={(
             <EmptyState
               icon={Building2}

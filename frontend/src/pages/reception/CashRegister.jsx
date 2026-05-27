@@ -273,6 +273,7 @@ export default function CashRegister() {
 
       <DataTable
         loading={loading}
+        isEmpty={history.length === 0}
         emptyState={(
           <EmptyState
             icon={History}

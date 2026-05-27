@@ -139,6 +139,7 @@ export default function SuperAdminDashboard() {
         </div>
 
         <DataTable
+          isEmpty={pendingClinicCount === 0}
           emptyState={(
             <EmptyState
               icon={AlertCircle}
