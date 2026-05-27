@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, ShieldCheck, Save, Play, RefreshCw } from 'lucide-react';
+import { MessageCircle, Play, RefreshCw, Save, ShieldCheck } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../lib/axios';
+import { Button, Card, Input, SectionHeader } from '../../components/ui';
 
 const defaultConfig = {
   enabled: false,
@@ -14,7 +15,7 @@ const defaultConfig = {
   webhookVerifyToken: '',
   remindersEnabled: false,
   jobIntervalMs: 300000,
-  windowMinutes: 15
+  windowMinutes: 15,
 };
 
 export default function WhatsAppSettings() {
@@ -28,7 +29,7 @@ export default function WhatsAppSettings() {
   const [testData, setTestData] = useState({
     to: '',
     templateName: 'hello_world',
-    templateLang: 'en_US'
+    templateLang: 'en_US',
   });
 
   const fetchStatus = async () => {
@@ -36,20 +37,21 @@ export default function WhatsAppSettings() {
       const { data } = await api.get('/reminders/config-status');
       const current = data.data;
       setStatus(current);
-      setConfig((prev) => ({
-        ...prev,
+      setConfig((previous) => ({
+        ...previous,
         enabled: current.enabled,
         dryRun: current.dryRun,
-        apiVersion: current.apiVersion || prev.apiVersion,
-        templateName: current.templateName || prev.templateName,
-        templateLang: current.templateLang || prev.templateLang,
-        phoneNumberId: current.phoneNumberId || ''
+        apiVersion: current.apiVersion || previous.apiVersion,
+        templateName: current.templateName || previous.templateName,
+        templateLang: current.templateLang || previous.templateLang,
+        phoneNumberId: current.phoneNumberId || '',
       }));
     } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'No se pudo cargar estado',
-        text: error?.response?.data?.message || 'Error consultando configuración WhatsApp.'
+        title: 'No se pudo cargar el estado',
+        text: error?.response?.data?.message || 'Error consultando configuración WhatsApp.',
+        confirmButtonColor: '#0f172a',
       });
     } finally {
       setLoading(false);
@@ -70,13 +72,15 @@ export default function WhatsAppSettings() {
         title: 'Configuración guardada',
         text: 'Se actualizó la configuración runtime de WhatsApp.',
         timer: 1500,
-        showConfirmButton: false
+        showConfirmButton: false,
+        confirmButtonColor: '#0f172a',
       });
     } catch (error) {
       Swal.fire({
         icon: 'error',
         title: 'No se pudo guardar',
-        text: error?.response?.data?.message || 'Error al guardar configuración.'
+        text: error?.response?.data?.message || 'Error al guardar configuración.',
+        confirmButtonColor: '#0f172a',
       });
     } finally {
       setSaving(false);
@@ -91,13 +95,15 @@ export default function WhatsAppSettings() {
       Swal.fire({
         icon: 'success',
         title: 'Job ejecutado',
-        text: `Escaneadas: ${result.scanned}, enviadas: ${result.sent}, omitidas: ${result.skipped}, fallidas: ${result.failed}`
+        text: `Escaneadas: ${result.scanned}, enviadas: ${result.sent}, omitidas: ${result.skipped}, fallidas: ${result.failed}`,
+        confirmButtonColor: '#0f172a',
       });
     } catch (error) {
       Swal.fire({
         icon: 'error',
         title: 'Job falló',
-        text: error?.response?.data?.message || 'No se pudo ejecutar el job 24h.'
+        text: error?.response?.data?.message || 'No se pudo ejecutar el job 24h.',
+        confirmButtonColor: '#0f172a',
       });
     } finally {
       setRunning(false);
@@ -109,7 +115,8 @@ export default function WhatsAppSettings() {
       Swal.fire({
         icon: 'warning',
         title: 'Número requerido',
-        text: 'Ingresa el número de WhatsApp de prueba.'
+        text: 'Ingresa el número de WhatsApp de prueba.',
+        confirmButtonColor: '#0f172a',
       });
       return;
     }
@@ -122,13 +129,15 @@ export default function WhatsAppSettings() {
       Swal.fire({
         icon: 'success',
         title: 'Prueba enviada',
-        text: `Mensaje enviado a ${result.to}. ID: ${result.messageId || 'N/A'}`
+        text: `Mensaje enviado a ${result.to}. ID: ${result.messageId || 'N/A'}`,
+        confirmButtonColor: '#0f172a',
       });
     } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'No se pudo enviar prueba',
-        text: error?.response?.data?.message || 'Error enviando mensaje de prueba.'
+        title: 'No se pudo enviar la prueba',
+        text: error?.response?.data?.message || 'Error enviando mensaje de prueba.',
+        confirmButtonColor: '#0f172a',
       });
     } finally {
       setSendingTest(false);
@@ -154,220 +163,231 @@ export default function WhatsAppSettings() {
         icon: result.failed > 0 ? 'warning' : 'success',
         title: 'Prueba a pacientes ejecutada',
         text: `Candidatos: ${result.totalCandidates}, Enviados: ${result.sent}, Fallidos: ${result.failed}${failedLines ? `. Errores: ${failedLines}` : ''}`,
+        confirmButtonColor: '#0f172a',
       });
     } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'No se pudo enviar prueba a pacientes',
+        title: 'No se pudo enviar la prueba a pacientes',
         text: error?.response?.data?.message || 'Error enviando prueba masiva a pacientes.',
+        confirmButtonColor: '#0f172a',
       });
     } finally {
       setSendingPatientsTest(false);
     }
   };
 
-  const statusColor = status?.readyForProduction
-    ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+  const statusTone = status?.readyForProduction
+    ? 'border-success-100 bg-success-50 text-success-600'
     : status?.readyForDryRun
-      ? 'text-amber-700 bg-amber-50 border-amber-200'
-      : 'text-rose-700 bg-rose-50 border-rose-200';
+      ? 'border-warning-100 bg-warning-50 text-warning-600'
+      : 'border-danger-100 bg-danger-50 text-danger-600';
 
   if (loading) {
-    return <div className="p-8 text-slate-500 font-bold uppercase text-xs">Cargando Configuración WhatsApp...</div>;
+    return (
+      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
+        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
+          <RefreshCw className="h-5 w-5 animate-spin text-primary-600" />
+          Cargando configuración WhatsApp...
+        </Card>
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-      <div className="border-b border-slate-200 pb-6">
-        <h1 className="text-3xl font-black uppercase tracking-tight text-slate-900 flex items-center gap-3">
-          <MessageCircle className="w-7 h-7 text-emerald-600" />
-          Configuración WhatsApp Meta
-        </h1>
-        <p className="text-slate-500 mt-2 font-bold text-xs uppercase tracking-widest">
-          Panel de configuración runtime para recordatorios de confirmación 24h.
-        </p>
-      </div>
+    <div className="mx-auto max-w-7xl space-y-section px-layout py-layout animate-in fade-in duration-500">
+      <SectionHeader
+        eyebrow="Mensajería y recordatorios"
+        title="Configuración WhatsApp Meta"
+        description="Panel runtime para recordatorios de confirmación 24h, pruebas y estado operativo."
+      />
 
-      <div className={`border rounded-2xl p-4 ${statusColor}`}>
-        <div className="flex items-center gap-2 font-black uppercase text-xs tracking-widest">
-          <ShieldCheck className="w-4 h-4" />
-          Estado Actual
-        </div>
-        <p className="mt-2 text-sm font-semibold">
-          {status?.readyForProduction
-            ? 'Listo para producción.'
-            : status?.readyForDryRun
-              ? 'Listo para pruebas (dry-run).'
-              : 'Configuración incompleta.'}
-        </p>
-        {!!status?.missing?.length && (
-          <p className="mt-2 text-xs font-bold uppercase tracking-wider">
-            Faltan: {status.missing.join(', ')}
-          </p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-          <h2 className="font-black text-sm uppercase tracking-widest text-slate-900">Credenciales Meta</h2>
-
-          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Access Token</label>
-          <input
-            type="password"
-            value={config.token}
-            onChange={(e) => setConfig({ ...config, token: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
-            placeholder="EAAG..."
-          />
-
-          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Phone Number ID</label>
-          <input
-            value={config.phoneNumberId}
-            onChange={(e) => setConfig({ ...config, phoneNumberId: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
-            placeholder="123456789012345"
-          />
-
-          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Webhook Verify Token</label>
-          <input
-            value={config.webhookVerifyToken}
-            onChange={(e) => setConfig({ ...config, webhookVerifyToken: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
-            placeholder="token-privado-seguro"
-          />
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-          <h2 className="font-black text-sm uppercase tracking-widest text-slate-900">Plantilla y Job</h2>
-
-          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Template Name</label>
-          <input
-            value={config.templateName}
-            onChange={(e) => setConfig({ ...config, templateName: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
-          />
-
-          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Template Lang</label>
-          <input
-            value={config.templateLang}
-            onChange={(e) => setConfig({ ...config, templateLang: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
-            placeholder="es_MX"
-          />
-
-          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">API Version</label>
-          <input
-            value={config.apiVersion}
-            onChange={(e) => setConfig({ ...config, apiVersion: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
-            placeholder="v21.0"
-          />
-
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-              <input
-                type="checkbox"
-                checked={config.enabled}
-                onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
-              />
-              WhatsApp Enabled
-            </label>
-            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-              <input
-                type="checkbox"
-                checked={config.dryRun}
-                onChange={(e) => setConfig({ ...config, dryRun: e.target.checked })}
-              />
-              Dry Run
-            </label>
-            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-              <input
-                type="checkbox"
-                checked={config.remindersEnabled}
-                onChange={(e) => setConfig({ ...config, remindersEnabled: e.target.checked })}
-              />
-              Scheduler Enabled
-            </label>
+      <Card className={`border ${statusTone} p-6`}>
+        <div className="flex items-start gap-3">
+          <div className="rounded-panel bg-surface p-2 shadow-soft">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-label">Estado actual</p>
+            <p className="text-body font-medium">
+              {status?.readyForProduction
+                ? 'Listo para producción.'
+                : status?.readyForDryRun
+                  ? 'Listo para pruebas (dry-run).'
+                  : 'Configuración incompleta.'}
+            </p>
+            {!!status?.missing?.length ? (
+              <p className="text-caption uppercase tracking-[0.16em] text-muted">
+                Faltan: {status.missing.join(', ')}
+              </p>
+            ) : null}
           </div>
         </div>
+      </Card>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-          <h2 className="font-black text-sm uppercase tracking-widest text-slate-900">Prueba Manual de Envío</h2>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card className="overflow-hidden">
+          <div className="border-b border-border bg-surface-muted px-6 py-5">
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-ink">
+              <MessageCircle className="h-4 w-4" />
+              Credenciales Meta
+            </div>
+            <p className="mt-1 text-body text-muted">Variables necesarias para la conexión con WhatsApp Cloud API.</p>
+          </div>
 
-          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Número destino (con lada)</label>
-          <input
-            value={testData.to}
-            onChange={(e) => setTestData({ ...testData, to: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
-            placeholder="5215512345678"
-          />
+          <div className="space-y-6 p-6">
+            <Input
+              type="password"
+              label="Access Token"
+              value={config.token}
+              onChange={(event) => setConfig({ ...config, token: event.target.value })}
+              placeholder="EAAG..."
+            />
 
-          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Template de prueba</label>
-          <input
-            value={testData.templateName}
-            onChange={(e) => setTestData({ ...testData, templateName: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
-            placeholder="hello_world"
-          />
+            <Input
+              label="Phone Number ID"
+              value={config.phoneNumberId}
+              onChange={(event) => setConfig({ ...config, phoneNumberId: event.target.value })}
+              placeholder="123456789012345"
+            />
 
-          <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">Idioma template</label>
-          <input
-            value={testData.templateLang}
-            onChange={(e) => setTestData({ ...testData, templateLang: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl p-3 text-sm font-semibold"
-            placeholder="en_US"
-          />
+            <Input
+              label="Webhook Verify Token"
+              value={config.webhookVerifyToken}
+              onChange={(event) => setConfig({ ...config, webhookVerifyToken: event.target.value })}
+              placeholder="token-privado-seguro"
+            />
+          </div>
+        </Card>
 
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            Sugerencia para Meta sandbox: hello_world + en_US.
-          </p>
-        </div>
+        <Card className="overflow-hidden">
+          <div className="border-b border-border bg-surface-muted px-6 py-5">
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-ink">
+              <RefreshCw className="h-4 w-4" />
+              Plantilla y job
+            </div>
+            <p className="mt-1 text-body text-muted">Ajustes del recordatorio 24h y validación de la plantilla de mensajería.</p>
+          </div>
+
+          <div className="space-y-6 p-6">
+            <Input
+              label="Template Name"
+              value={config.templateName}
+              onChange={(event) => setConfig({ ...config, templateName: event.target.value })}
+            />
+
+            <Input
+              label="Template Lang"
+              value={config.templateLang}
+              onChange={(event) => setConfig({ ...config, templateLang: event.target.value })}
+              placeholder="es_MX"
+            />
+
+            <Input
+              label="API Version"
+              value={config.apiVersion}
+              onChange={(event) => setConfig({ ...config, apiVersion: event.target.value })}
+              placeholder="v21.0"
+            />
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex items-center gap-3 rounded-panel border border-border bg-surface px-4 py-3 text-sm font-medium text-ink">
+                <input
+                  type="checkbox"
+                  checked={config.enabled}
+                  onChange={(event) => setConfig({ ...config, enabled: event.target.checked })}
+                  className="h-4 w-4 rounded border-border text-primary-600 focus:ring-primary-500"
+                />
+                WhatsApp enabled
+              </label>
+              <label className="flex items-center gap-3 rounded-panel border border-border bg-surface px-4 py-3 text-sm font-medium text-ink">
+                <input
+                  type="checkbox"
+                  checked={config.dryRun}
+                  onChange={(event) => setConfig({ ...config, dryRun: event.target.checked })}
+                  className="h-4 w-4 rounded border-border text-primary-600 focus:ring-primary-500"
+                />
+                Dry run
+              </label>
+              <label className="flex items-center gap-3 rounded-panel border border-border bg-surface px-4 py-3 text-sm font-medium text-ink sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={config.remindersEnabled}
+                  onChange={(event) => setConfig({ ...config, remindersEnabled: event.target.checked })}
+                  className="h-4 w-4 rounded border-border text-primary-600 focus:ring-primary-500"
+                />
+                Scheduler enabled
+              </label>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden lg:col-span-2">
+          <div className="border-b border-border bg-surface-muted px-6 py-5">
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-ink">
+              <Play className="h-4 w-4" />
+              Prueba manual de envío
+            </div>
+            <p className="mt-1 text-body text-muted">Envía mensajes de prueba a un número o a pacientes registrados para validar el flujo completo.</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-3">
+            <Input
+              label="Número destino"
+              value={testData.to}
+              onChange={(event) => setTestData({ ...testData, to: event.target.value })}
+              placeholder="5215512345678"
+              containerClassName="lg:col-span-1"
+            />
+
+            <Input
+              label="Template de prueba"
+              value={testData.templateName}
+              onChange={(event) => setTestData({ ...testData, templateName: event.target.value })}
+              placeholder="hello_world"
+            />
+
+            <Input
+              label="Idioma del template"
+              value={testData.templateLang}
+              onChange={(event) => setTestData({ ...testData, templateLang: event.target.value })}
+              placeholder="en_US"
+            />
+          </div>
+
+          <div className="border-t border-border bg-surface-muted px-6 py-4">
+            <p className="text-caption uppercase tracking-[0.16em] text-muted">
+              Sugerencia para Meta sandbox: hello_world + en_US.
+            </p>
+          </div>
+        </Card>
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-6 py-3 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-black flex items-center gap-2"
-        >
-          {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Guardar Configuración
-        </button>
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Guardar configuración
+        </Button>
 
-        <button
-          onClick={fetchStatus}
-          className="px-6 py-3 rounded-xl border border-slate-300 text-slate-700 text-xs font-black uppercase tracking-widest hover:bg-slate-100 flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refrescar Estado
-        </button>
+        <Button variant="secondary" onClick={fetchStatus}>
+          <RefreshCw className="h-4 w-4" />
+          Refrescar estado
+        </Button>
 
-        <button
-          onClick={handleRun24hJob}
-          disabled={running}
-          className="px-6 py-3 rounded-xl bg-emerald-600 text-white text-xs font-black uppercase tracking-widest hover:bg-emerald-700 flex items-center gap-2"
-        >
-          {running ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          Ejecutar Job 24h
-        </button>
+        <Button variant="secondary" onClick={handleRun24hJob} disabled={running}>
+          {running ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+          Ejecutar job 24h
+        </Button>
 
-        <button
-          onClick={handleSendTestToPatients}
-          disabled={sendingPatientsTest}
-          className="px-6 py-3 rounded-xl bg-fuchsia-600 text-white text-xs font-black uppercase tracking-widest hover:bg-fuchsia-700 flex items-center gap-2"
-        >
-          {sendingPatientsTest ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          Probar con Pacientes Registrados
-        </button>
+        <Button variant="secondary" onClick={handleSendTestToPatients} disabled={sendingPatientsTest}>
+          {sendingPatientsTest ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+          Probar con pacientes
+        </Button>
 
-        <button
-          onClick={handleSendTest}
-          disabled={sendingTest}
-          className="px-6 py-3 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-widest hover:bg-indigo-700 flex items-center gap-2"
-        >
-          {sendingTest ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          Enviar Prueba WhatsApp
-        </button>
+        <Button variant="secondary" onClick={handleSendTest} disabled={sendingTest}>
+          {sendingTest ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+          Enviar prueba WhatsApp
+        </Button>
       </div>
     </div>
   );
