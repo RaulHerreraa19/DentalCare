@@ -285,7 +285,7 @@ export default function MedicalRecordsFollowup() {
                         <td className="px-6 py-4">
                           <div className="flex gap-2">
                             <button
-                              onClick={() => navigate(`/doctor/expedient/${record.patient_id}`)}
+                              onClick={() => navigate(`/doctor/medical-records/${record.patient_id}`)}
                               className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"
                               title="Editar expediente"
                             >
@@ -293,7 +293,7 @@ export default function MedicalRecordsFollowup() {
                               Editar
                             </button>
                             <button
-                              onClick={() => navigate(`/doctor/expedient/${record.patient_id}?view=true`)}
+                              onClick={() => navigate(`/doctor/medical-records/${record.patient_id}?view=true`)}
                               className="flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-700 rounded hover:bg-slate-200 text-sm"
                               title="Ver detalles"
                             >

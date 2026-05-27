@@ -106,16 +106,39 @@ class MedicalRecordsService {
     });
 
     if (!record) {
-      record = await db.medicalRecord.create({
-        data: {
-          patient_id: patientId,
-          doctor_id: doctorId,
-          organization_id: patient.organization_id,
-        },
-        include: {
-          notes: true,
-        },
-      });
+      try {
+        record = await db.medicalRecord.create({
+          data: {
+            patient_id: patientId,
+            doctor_id: doctorId,
+            organization_id: patient.organization_id,
+          },
+          include: {
+            notes: true,
+          },
+        });
+      } catch (error) {
+        // Si dos requests llegan al mismo tiempo, una puede chocar con @@unique(patient_id, doctor_id).
+        // En ese caso reutilizamos el expediente ya creado por la otra request.
+        if (error?.code === "P2002") {
+          record = await db.medicalRecord.findUnique({
+            where: {
+              patient_id_doctor_id: {
+                patient_id: patientId,
+                doctor_id: doctorId,
+              },
+            },
+            include: {
+              notes: {
+                orderBy: { created_at: "desc" },
+                take: 10,
+              },
+            },
+          });
+        } else {
+          throw error;
+        }
+      }
     }
 
     return attachLatestOdontogram(record);
