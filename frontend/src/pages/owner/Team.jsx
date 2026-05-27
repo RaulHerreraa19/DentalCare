@@ -1,41 +1,51 @@
 import React, { useEffect, useState } from 'react';
-import api from '../../lib/axios';
-import { UserPlus, Star, UserCheck, Shield, Edit2, X, Check } from 'lucide-react';
+import { Check, Edit2, Shield, UserCheck, UserPlus, X } from 'lucide-react';
 import Swal from 'sweetalert2';
+import api from '../../lib/axios';
 import { isStrongPassword, isValidEmail, normalizeEmail } from '../../lib/validators';
+import {
+  Button,
+  Card,
+  DataTable,
+  EmptyState,
+  Input,
+  KPIStatCard,
+  SectionHeader,
+  SelectControl,
+} from '../../components/ui';
+
+const initialFormData = {
+  first_name: '',
+  last_name: '',
+  email: '',
+  password: '',
+  role: 'DOCTOR',
+  clinic_id: '',
+  office_ids: [],
+  supervisor_id: '',
+  is_active: true,
+};
 
 export default function OwnerTeam() {
   const [employees, setEmployees] = useState([]);
   const [clinics, setClinics] = useState([]);
   const [offices, setOffices] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Form State
   const [showForm, setShowForm] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
-  const [formData, setFormData] = useState({
-    first_name: '', 
-    last_name: '', 
-    email: '', 
-    password: '', 
-    role: 'DOCTOR',
-    clinic_id: '', 
-    office_ids: [], 
-    supervisor_id: '',
-    is_active: true
-  });
+  const [formData, setFormData] = useState(initialFormData);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const [teamRes, clinicsRes] = await Promise.all([
         api.get('/users/team'),
-        api.get('/clinics')
+        api.get('/clinics'),
       ]);
       setEmployees(teamRes.data.data);
       setClinics(clinicsRes.data.data);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -45,25 +55,28 @@ export default function OwnerTeam() {
     fetchData();
   }, []);
 
-  // Sync offices when clinic changes
   useEffect(() => {
     if (!formData.clinic_id) {
       setOffices([]);
       return;
     }
 
-    api.get(`/clinics/${formData.clinic_id}/offices`).then(res => {
-      setOffices(res.data.data || []);
-    }).catch(() => setOffices([]));
+    api
+      .get(`/clinics/${formData.clinic_id}/offices`)
+      .then((response) => setOffices(response.data.data || []))
+      .catch(() => setOffices([]));
   }, [formData.clinic_id]);
 
   const handleOpenInvite = () => {
+    if (showForm && !editingUserId) {
+      setShowForm(false);
+      return;
+    }
+
     setEditingUserId(null);
-    setFormData({ 
-      first_name: '', last_name: '', email: '', password: '', role: 'DOCTOR', 
-      clinic_id: '', office_ids: [], supervisor_id: '', is_active: true
-    });
-    setShowForm(!showForm);
+    setFormData(initialFormData);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleEdit = (user) => {
@@ -75,29 +88,31 @@ export default function OwnerTeam() {
       password: '',
       role: user.role,
       clinic_id: user.clinic_assignments?.[0]?.clinic_id || '',
-      office_ids: user.office_assignments?.map(oa => oa.office_id) || [],
+      office_ids: user.office_assignments?.map((assignment) => assignment.office_id) || [],
       supervisor_id: user.supervisor_id || '',
-      is_active: user.is_active
+      is_active: user.is_active,
     });
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const toggleOfficeSelection = (officeId) => {
-    setFormData(prev => {
-      if (prev.role === 'DOCTOR') {
-        return { ...prev, office_ids: [officeId] };
+    setFormData((current) => {
+      if (current.role === 'DOCTOR') {
+        return { ...current, office_ids: [officeId] };
       }
-      const current = prev.office_ids;
-      if (current.includes(officeId)) {
-        return { ...prev, office_ids: current.filter(id => id !== officeId) };
+
+      if (current.office_ids.includes(officeId)) {
+        return { ...current, office_ids: current.office_ids.filter((id) => id !== officeId) };
       }
-      return { ...prev, office_ids: [...current, officeId] };
+
+      return { ...current, office_ids: [...current.office_ids, officeId] };
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
     const safeEmail = normalizeEmail(formData.email);
 
     if (!isValidEmail(safeEmail)) {
@@ -105,7 +120,7 @@ export default function OwnerTeam() {
         icon: 'warning',
         title: 'Correo inválido',
         text: 'Ingresa un correo electrónico con formato válido.',
-        confirmButtonColor: '#0f172a'
+        confirmButtonColor: '#0f172a',
       });
       return;
     }
@@ -115,7 +130,7 @@ export default function OwnerTeam() {
         icon: 'warning',
         title: 'Contraseña insegura',
         text: 'La contraseña debe tener 8+ caracteres, mayúscula, minúscula, número y símbolo.',
-        confirmButtonColor: '#0f172a'
+        confirmButtonColor: '#0f172a',
       });
       return;
     }
@@ -123,18 +138,19 @@ export default function OwnerTeam() {
     if (!formData.clinic_id) {
       Swal.fire({
         icon: 'warning',
-        title: 'Selección Requerida',
-        text: 'Por favor seleccione una sucursal para la asignación.',
-        confirmButtonColor: '#0f172a'
+        title: 'Selección requerida',
+        text: 'Por favor selecciona una sucursal para la asignación.',
+        confirmButtonColor: '#0f172a',
       });
       return;
     }
+
     if (formData.office_ids.length === 0) {
       Swal.fire({
         icon: 'warning',
-        title: 'Selección Requerida',
-        text: 'Por favor seleccione al menos un consultorio o área de trabajo.',
-        confirmButtonColor: '#0f172a'
+        title: 'Selección requerida',
+        text: 'Por favor selecciona al menos un consultorio o área de trabajo.',
+        confirmButtonColor: '#0f172a',
       });
       return;
     }
@@ -146,258 +162,373 @@ export default function OwnerTeam() {
         await api.post('/users/invite', {
           ...formData,
           email: safeEmail,
-          clinics: [formData.clinic_id]
+          clinics: [formData.clinic_id],
         });
       }
-      
+
       setShowForm(false);
       setEditingUserId(null);
+      setFormData(initialFormData);
+
       await Swal.fire({
         icon: 'success',
-        title: editingUserId ? 'Información Actualizada' : 'Invitación Enviada',
-        text: editingUserId 
-          ? 'Los cambios en el perfil del colaborador han sido guardados.' 
+        title: editingUserId ? 'Información actualizada' : 'Invitación enviada',
+        text: editingUserId
+          ? 'Los cambios en el perfil del colaborador han sido guardados.'
           : 'Se ha registrado el acceso y enviado las credenciales al correo especificado.',
         confirmButtonColor: '#0f172a',
-        timer: 1500
+        timer: 1500,
       });
+
       fetchData();
     } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'Error de Gestión',
+        title: 'Error de gestión',
         text: error.response?.data?.message || 'No se pudo completar la operación en el sistema.',
-        confirmButtonColor: '#0f172a'
+        confirmButtonColor: '#0f172a',
       });
     }
   };
 
-  if (loading && employees.length === 0) return <div className="p-8 text-slate-600 font-medium">Cargando personal...</div>;
+  const doctorCount = employees.filter((user) => user.role === 'DOCTOR').length;
+  const receptionistCount = employees.filter((user) => user.role === 'RECEPTIONIST').length;
+
+  if (loading && employees.length === 0) {
+    return (
+      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
+        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
+          <UserCheck className="h-5 w-5 animate-pulse text-primary-600" />
+          Cargando personal...
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Gestión de Personal</h1>
-           <p className="text-slate-500 mt-1">Administración de equipo y asignación de consultorios.</p>
-        </div>
-        <button 
-          onClick={handleOpenInvite}
-          className="bg-slate-900 text-white px-6 py-2.5 rounded-lg flex items-center hover:bg-slate-800 transition-all font-semibold"
-        >
-          <UserPlus className="w-5 h-5 mr-2" /> 
-          {showForm && !editingUserId ? 'Cancelar' : 'Invitar Personal'}
-        </button>
+    <div className="mx-auto max-w-7xl space-y-section px-layout py-layout animate-in fade-in duration-500">
+      <SectionHeader
+        eyebrow="Operación y talento"
+        title="Gestión de personal"
+        description="Administración de equipo y asignación de consultorios."
+        actions={(
+          <Button onClick={handleOpenInvite} size="sm">
+            <UserPlus className="h-4 w-4" />
+            {showForm && !editingUserId ? 'Cancelar' : 'Invitar personal'}
+          </Button>
+        )}
+      />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <KPIStatCard
+          title="Colaboradores"
+          value={employees.length}
+          icon={UserCheck}
+          tone="primary"
+          footer="Personal registrado"
+        />
+        <KPIStatCard
+          title="Médicos"
+          value={doctorCount}
+          icon={Shield}
+          tone="success"
+          footer="Rol clínico"
+        />
+        <KPIStatCard
+          title="Recepción"
+          value={receptionistCount}
+          icon={UserPlus}
+          tone="accent"
+          footer="Rol operativo"
+        />
       </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-4">
-          <div className="flex justify-between items-center mb-8 pb-4 border-b border-slate-100">
-             <h2 className="text-xl font-bold text-slate-900">
-               {editingUserId ? 'Editar Información' : 'Nuevo Miembro'}
-             </h2>
-             {editingUserId && (
-               <label className="flex items-center space-x-3 cursor-pointer">
-                 <span className="text-sm font-semibold text-slate-700">Estado de la cuenta</span>
-                 <div 
-                   onClick={() => setFormData({...formData, is_active: !formData.is_active})}
-                   className={`w-12 h-6 rounded-full transition-colors relative ${formData.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                 >
-                   <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${formData.is_active ? 'translate-x-6' : ''}`} />
-                 </div>
-               </label>
-             )}
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <div className="space-y-6">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Datos Personales</h3>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 pl-1">Nombre</label>
-                  <input required className="w-full border border-slate-200 p-2.5 rounded-lg focus:ring-1 focus:ring-slate-900 outline-none" value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 pl-1">Apellido</label>
-                  <input required className="w-full border border-slate-200 p-2.5 rounded-lg focus:ring-1 focus:ring-slate-900 outline-none" value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-slate-700 pl-1">Email</label>
-                <input required disabled={!!editingUserId} type="email" className="w-full border border-slate-200 p-2.5 rounded-lg focus:ring-1 focus:ring-slate-900 outline-none disabled:bg-slate-50 disabled:text-slate-400" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-              </div>
-              
-              {!editingUserId && (
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 pl-1">Contraseña Temporal</label>
-                  <input required type="password" className="w-full border border-slate-200 p-2.5 rounded-lg focus:ring-1 focus:ring-slate-900 outline-none" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-                </div>
-              )}
+      {showForm ? (
+        <Card className="overflow-hidden">
+          <div className="flex flex-col gap-4 border-b border-border bg-surface-muted px-6 py-5 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
+              <p className="text-label text-muted">Formulario de personal</p>
+              <h2 className="text-section-title text-ink">
+                {editingUserId ? 'Editar información' : 'Nuevo miembro'}
+              </h2>
+              <p className="text-body text-muted">
+                Define identidad, rol y asignación operativa para este colaborador.
+              </p>
             </div>
 
-            <div className="space-y-6">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Asignación Operativa</h3>
-              
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-slate-700 pl-1">Rol</label>
-                <select 
-                  disabled={!!editingUserId} 
-                  className="w-full border border-slate-200 p-2.5 rounded-lg bg-white focus:ring-1 focus:ring-slate-900 outline-none disabled:bg-slate-50" 
-                  value={formData.role} 
-                  onChange={e => setFormData({...formData, role: e.target.value, office_ids: []})}
+            {editingUserId ? (
+              <button
+                type="button"
+                onClick={() => setFormData((current) => ({ ...current, is_active: !current.is_active }))}
+                className="inline-flex items-center gap-3 rounded-panel border border-border bg-surface px-3 py-2 text-sm text-ink transition-colors hover:bg-surface-muted"
+              >
+                <span className="font-medium">Estado de la cuenta</span>
+                <span
+                  className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors ${formData.is_active ? 'bg-success-600' : 'bg-border'}`}
+                  aria-hidden="true"
                 >
-                  <option value="DOCTOR">Médico Especialista</option>
-                  <option value="RECEPTIONIST">Personal de Recepción</option>
-                </select>
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_active ? 'translate-x-7' : 'translate-x-1'}`}
+                  />
+                </span>
+                <span className="text-caption uppercase tracking-[0.16em] text-muted">
+                  {formData.is_active ? 'Activo' : 'Inactivo'}
+                </span>
+              </button>
+            ) : null}
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 gap-8 p-6 lg:grid-cols-2">
+              <div className="space-y-6">
+                <div className="space-y-1">
+                  <h3 className="text-label text-muted">Datos personales</h3>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <Input
+                    required
+                    label="Nombre"
+                    value={formData.first_name}
+                    onChange={(event) => setFormData({ ...formData, first_name: event.target.value })}
+                  />
+                  <Input
+                    required
+                    label="Apellido"
+                    value={formData.last_name}
+                    onChange={(event) => setFormData({ ...formData, last_name: event.target.value })}
+                  />
+                </div>
+
+                <Input
+                  required
+                  disabled={Boolean(editingUserId)}
+                  type="email"
+                  label="Correo electrónico"
+                  value={formData.email}
+                  onChange={(event) => setFormData({ ...formData, email: event.target.value })}
+                  helperText={editingUserId ? 'El correo no puede editarse después de enviar la invitación.' : undefined}
+                />
+
+                {!editingUserId ? (
+                  <Input
+                    required
+                    type="password"
+                    label="Contraseña temporal"
+                    value={formData.password}
+                    onChange={(event) => setFormData({ ...formData, password: event.target.value })}
+                    helperText="Debe cumplir con la política de seguridad definida por la plataforma."
+                  />
+                ) : null}
               </div>
 
-              <div className="space-y-4">
-                 <div className="space-y-1">
-                    <label className="text-sm font-semibold text-slate-700 pl-1">Sucursal</label>
-                    <select 
-                      required
-                      className="w-full border border-slate-200 p-2.5 rounded-lg bg-white focus:ring-1 focus:ring-slate-900 outline-none"
-                      value={formData.clinic_id}
-                      onChange={e => setFormData({...formData, clinic_id: e.target.value, office_ids: []})}
-                    >
-                      <option value="">Seleccione sucursal</option>
-                      {clinics.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                 </div>
-                 
-                 <div className="space-y-1">
-                    <label className="text-sm font-semibold text-slate-700 pl-1">
+              <div className="space-y-6">
+                <div className="space-y-1">
+                  <h3 className="text-label text-muted">Asignación operativa</h3>
+                </div>
+
+                <SelectControl
+                  label="Rol"
+                  disabled={Boolean(editingUserId)}
+                  value={formData.role}
+                  onChange={(event) => setFormData({ ...formData, role: event.target.value, office_ids: [] })}
+                >
+                  <option value="DOCTOR">Médico especialista</option>
+                  <option value="RECEPTIONIST">Personal de recepción</option>
+                </SelectControl>
+
+                <SelectControl
+                  required
+                  label="Sucursal"
+                  value={formData.clinic_id}
+                  onChange={(event) => setFormData({ ...formData, clinic_id: event.target.value, office_ids: [] })}
+                >
+                  <option value="">Seleccione sucursal</option>
+                  {clinics.map((clinic) => (
+                    <option key={clinic.id} value={clinic.id}>
+                      {clinic.name}
+                    </option>
+                  ))}
+                </SelectControl>
+
+                <div className="space-y-2">
+                  <div className="flex items-end justify-between gap-3">
+                    <label className="text-sm font-medium text-muted">
                       Consultorios {formData.role === 'RECEPTIONIST' ? '(Selección múltiple)' : '(Selección única)'}
                     </label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                       {offices.map(o => (
-                         <button
-                           key={o.id}
-                           type="button"
-                           onClick={() => toggleOfficeSelection(o.id)}
-                           className={`p-2 text-xs font-semibold rounded-lg border transition-all flex items-center justify-between ${
-                             formData.office_ids.includes(o.id) 
-                             ? 'bg-slate-900 text-white border-slate-900' 
-                             : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-                           }`}
-                         >
-                           {o.name}
-                           {formData.office_ids.includes(o.id) && <Check className="w-3 h-3 ml-1" />}
-                         </button>
-                       ))}
-                       {offices.length === 0 && (
-                         <div className="col-span-full py-4 text-center border-2 border-dashed border-slate-100 rounded-lg text-slate-400 text-xs font-medium">
-                           {formData.clinic_id ? 'No hay consultorios registrados' : 'Seleccione una sucursal primero'}
-                         </div>
-                       )}
-                    </div>
-                 </div>
-              </div>
+                    {formData.clinic_id ? (
+                      <span className="text-caption uppercase tracking-[0.16em] text-muted">
+                        {offices.length} disponibles
+                      </span>
+                    ) : null}
+                  </div>
 
-              {formData.role === 'RECEPTIONIST' && (
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 pl-1">Supervisor Directo</label>
-                  <select 
-                    className="w-full border border-slate-200 p-2.5 rounded-lg bg-white focus:ring-1 focus:ring-slate-900 outline-none"
+                  <div className="rounded-panel border border-border bg-surface p-4">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {offices.map((office) => {
+                        const selected = formData.office_ids.includes(office.id);
+
+                        return (
+                          <Button
+                            key={office.id}
+                            type="button"
+                            variant={selected ? 'primary' : 'secondary'}
+                            size="sm"
+                            className="justify-between"
+                            onClick={() => toggleOfficeSelection(office.id)}
+                          >
+                            <span className="truncate">{office.name}</span>
+                            {selected ? <Check className="h-3.5 w-3.5" /> : null}
+                          </Button>
+                        );
+                      })}
+
+                      {offices.length === 0 ? (
+                        <div className="col-span-full rounded-panel border border-dashed border-border bg-surface-muted px-4 py-5 text-center text-caption text-muted">
+                          {formData.clinic_id ? 'No hay consultorios registrados' : 'Seleccione una sucursal primero'}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                {formData.role === 'RECEPTIONIST' ? (
+                  <SelectControl
+                    label="Supervisor directo"
                     value={formData.supervisor_id}
-                    onChange={e => setFormData({...formData, supervisor_id: e.target.value})}
+                    onChange={(event) => setFormData({ ...formData, supervisor_id: event.target.value })}
                   >
                     <option value="">Ninguno / General</option>
-                    {employees.filter(u => u.role === 'DOCTOR' && u.id !== editingUserId).map(d => (
-                      <option key={d.id} value={d.id}>{d.first_name} {d.last_name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                    {employees
+                      .filter((user) => user.role === 'DOCTOR' && user.id !== editingUserId)
+                      .map((doctor) => (
+                        <option key={doctor.id} value={doctor.id}>
+                          {doctor.first_name} {doctor.last_name}
+                        </option>
+                      ))}
+                  </SelectControl>
+                ) : null}
+              </div>
             </div>
-          </div>
 
-          <div className="mt-12 pt-8 border-t border-slate-100 flex justify-end gap-4">
-            <button 
-              type="button" 
-              onClick={() => { setShowForm(false); setEditingUserId(null); }}
-              className="px-6 py-2.5 rounded-lg font-semibold text-slate-500 hover:bg-slate-50 transition"
-            >
-              Cancelar
-            </button>
-            <button type="submit" className="bg-slate-900 text-white px-8 py-2.5 rounded-lg font-semibold hover:bg-slate-800 transition shadow-sm">
-              {editingUserId ? 'Guardar Cambios' : 'Confirmar Registro'}
-            </button>
-          </div>
-        </form>
-      )}
+            <div className="flex flex-col gap-3 border-t border-border bg-surface-muted px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingUserId(null);
+                  setFormData(initialFormData);
+                }}
+              >
+                <X className="h-4 w-4" />
+                Cancelar
+              </Button>
+              <Button type="submit">
+                {editingUserId ? <Edit2 className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                {editingUserId ? 'Guardar cambios' : 'Confirmar registro'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      ) : null}
 
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Colaborador</th>
-                <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Rol</th>
-                <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Asignación</th>
-                <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
+      <Card className="overflow-hidden">
+        <div className="border-b border-border bg-surface-muted px-6 py-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div className="space-y-1">
+              <p className="text-label text-muted">Equipo activo</p>
+              <h2 className="text-section-title text-ink">Colaboradores registrados</h2>
+              <p className="text-body text-muted">Vista consolidada por rol, asignación y estado de cuenta.</p>
+            </div>
+            <span className="text-caption uppercase tracking-[0.16em] text-muted">
+              {employees.length} registros
+            </span>
+          </div>
+        </div>
+
+        <DataTable
+          loading={loading && employees.length > 0}
+          emptyState={(
+            <EmptyState
+              icon={Shield}
+              title="Sin registros de personal"
+              description="Invita el primer miembro para comenzar a asignar roles, sucursal y consultorios."
+            />
+          )}
+        >
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-surface">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">
+                  Colaborador
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">
+                  Rol
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">
+                  Asignación
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">
+                  Estado
+                </th>
+                <th scope="col" className="px-6 py-3 text-right text-caption uppercase tracking-[0.14em] text-muted">
+                  Acciones
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {employees.map(user => {
-                 const assignedClinic = user.clinic_assignments?.[0]?.clinic?.name || 'No asignada';
-                 const userOffices = user.office_assignments?.map(oa => oa.office?.name).join(', ') || 'Sin consultorio';
+            <tbody className="divide-y divide-border bg-surface">
+              {employees.map((user) => {
+                const assignedClinic = user.clinic_assignments?.[0]?.clinic?.name || 'No asignada';
+                const userOffices = user.office_assignments?.map((assignment) => assignment.office?.name).join(', ') || 'Sin consultorio';
 
-                 return (
-                <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <div className="h-9 w-9 rounded bg-slate-100 flex items-center justify-center text-slate-600 font-bold mr-3 border border-slate-200">
-                        {user.first_name[0]}
+                return (
+                  <tr key={user.id} className="transition-colors hover:bg-surface-muted/60">
+                    <td className="px-6 py-4 align-top">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-panel border border-border bg-surface-muted font-medium text-ink">
+                          {user.first_name?.[0] || 'U'}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-ink">
+                            {user.first_name} {user.last_name}
+                          </div>
+                          <div className="text-caption text-muted">{user.email}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">{user.first_name} {user.last_name}</div>
-                        <div className="text-xs text-slate-500">{user.email}</div>
+                    </td>
+                    <td className="px-6 py-4 align-top">
+                      <span className="inline-flex items-center rounded-control border border-border bg-surface-muted px-3 py-1 text-caption text-muted">
+                        {user.role === 'DOCTOR' ? 'Médico' : 'Recepción'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 align-top">
+                      <div className="space-y-1">
+                        <div className="text-sm text-ink">{assignedClinic}</div>
+                        <div className="max-w-[260px] truncate text-caption text-muted" title={userOffices}>
+                          {userOffices}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight border ${
-                      user.role === 'DOCTOR' ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-100 text-slate-700 border-slate-200'
-                    }`}>
-                      {user.role === 'DOCTOR' ? 'Médico' : 'Recepción'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-xs font-semibold text-slate-700">{assignedClinic}</div>
-                    <div className="text-[11px] text-slate-500 font-medium truncate max-w-[200px]" title={userOffices}>
-                      {userOffices}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                       <div className={`h-1.5 w-1.5 rounded-full mr-2 ${user.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                       <span className={`text-[11px] font-bold uppercase tracking-tight ${user.is_active ? 'text-emerald-700' : 'text-slate-500'}`}>
-                         {user.is_active ? 'Activo' : 'Inactivo'}
-                       </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => handleEdit(user)}
-                      className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              )})}
+                    </td>
+                    <td className="px-6 py-4 align-top">
+                      <span className={`inline-flex items-center gap-2 rounded-control border px-3 py-1 text-caption ${user.is_active ? 'border-success-100 bg-success-50 text-success-600' : 'border-border bg-surface text-muted'}`}>
+                        <span className={`h-2 w-2 rounded-full ${user.is_active ? 'bg-success-600' : 'bg-border'}`} />
+                        {user.is_active ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 align-top text-right">
+                      <Button variant="secondary" size="sm" onClick={() => handleEdit(user)}>
+                        <Edit2 className="h-4 w-4" />
+                        Editar
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        </div>
-        {employees.length === 0 && (
-          <div className="p-16 text-center">
-             <Shield className="h-8 w-8 text-slate-200 mx-auto mb-3" />
-             <p className="text-slate-400 font-semibold tracking-tight text-sm uppercase">Sin registros de personal</p>
-          </div>
-        )}
-      </div>
+        </DataTable>
+      </Card>
     </div>
   );
 }

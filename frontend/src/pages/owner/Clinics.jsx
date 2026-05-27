@@ -1,14 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../lib/axios';
-import { Plus, Building, Lock, ChevronDown, ChevronUp, MapPin, Edit3, Image as ImageIcon, Phone, Save, X, Building2 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import {
+  Building,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  Edit3,
+  Image as ImageIcon,
+  Lock,
+  MapPin,
+  Phone,
+  Plus,
+  Save,
+  X,
+} from 'lucide-react';
 import { isValidPhone, normalizePhone } from '../../lib/validators';
+import { Button, Card, DataTable, EmptyState, Input, SectionHeader } from '../../components/ui';
 
 export default function OwnerClinics() {
   const [clinics, setClinics] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Form
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -26,8 +38,8 @@ export default function OwnerClinics() {
     fetchClinics();
   }, []);
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
+  const handleCreate = async (event) => {
+    event.preventDefault();
     try {
       await api.post('/clinics', { name, address });
       setShowForm(false);
@@ -35,87 +47,122 @@ export default function OwnerClinics() {
       setAddress('');
       await Swal.fire({
         icon: 'success',
-        title: 'Sucursal Registrada',
+        title: 'Sucursal registrada',
         text: 'La nueva unidad de negocio ha sido dada de alta exitosamente.',
         confirmButtonColor: '#0f172a',
-        timer: 1500
+        timer: 1500,
       });
       fetchClinics();
     } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'Error de Red',
+        title: 'Error de red',
         text: 'No se pudo completar el registro de la sucursal.',
-        confirmButtonColor: '#0f172a'
+        confirmButtonColor: '#0f172a',
       });
     }
   };
 
-  if (loading) return <div className="p-8 text-slate-600 font-medium">Sincronizando centros...</div>;
+  if (loading) {
+    return (
+      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
+        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
+          <Building2 className="h-5 w-5 animate-pulse text-primary-600" />
+          Sincronizando centros...
+        </Card>
+      </div>
+    );
+  }
+
+  const activeClinics = clinics.filter((clinic) => clinic.status === 'ACTIVE').length;
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 py-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Gestión de Sucursales</h1>
-          <p className="text-slate-500 mt-1 font-medium">Configuración de identidad visual y distribución operativa.</p>
-        </div>
-        <button 
-          onClick={() => setShowForm(!showForm)}
-          className="bg-slate-900 text-white px-6 py-2.5 rounded-lg flex items-center hover:bg-black transition-all font-semibold shadow-lg shadow-slate-200"
-        >
-          <Plus className="w-5 h-5 mr-2" /> Registrar Nueva Sucursal
-        </button>
+    <div className="mx-auto max-w-7xl space-y-section px-layout py-layout animate-in fade-in duration-500">
+      <SectionHeader
+        eyebrow="Operación por sucursal"
+        title="Gestión de sucursales"
+        description="Configuración de identidad visual y distribución operativa."
+        actions={(
+          <Button onClick={() => setShowForm((current) => !current)} size="sm">
+            <Plus className="h-4 w-4" />
+            {showForm ? 'Ocultar alta' : 'Registrar nueva sucursal'}
+          </Button>
+        )}
+      />
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="p-6">
+          <p className="text-label text-muted">Sucursales registradas</p>
+          <div className="mt-2 text-4xl font-semibold tracking-tight text-ink">{clinics.length}</div>
+          <p className="mt-2 text-body text-muted">Unidades operativas bajo esta organización.</p>
+        </Card>
+        <Card className="p-6">
+          <p className="text-label text-muted">Sucursales activas</p>
+          <div className="mt-2 text-4xl font-semibold tracking-tight text-ink">{activeClinics}</div>
+          <p className="mt-2 text-body text-muted">Disponibles para operar y expandir consultorios.</p>
+        </Card>
       </div>
 
-      {showForm && (
-        <form onSubmit={handleCreate} className="bg-white p-8 rounded-lg border border-slate-200 shadow-xl animate-in fade-in slide-in-from-top-4">
-          <h2 className="text-xl font-bold mb-6 text-slate-900 pb-4 border-b border-slate-100 flex items-center">
-             <Building className="w-5 h-5 mr-3 text-slate-400" /> Datos de la Sucursal
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-1">
-              <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest pl-1">Nombre Comercial</label>
-              <input 
-                required
-                placeholder="Ej. Clínica Dental Central" 
-                className="w-full border border-slate-200 p-3 rounded text-sm focus:ring-1 focus:ring-slate-900 outline-none" 
-                value={name} onChange={e => setName(e.target.value)} 
-              />
+      {showForm ? (
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-border bg-surface-muted px-6 py-5">
+            <div className="rounded-panel bg-primary-50 p-2 text-primary-600">
+              <Building className="h-5 w-5" />
             </div>
-            <div className="space-y-1">
-              <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest pl-1">Dirección Física Completa</label>
-              <input 
-                required
-                placeholder="Calle, Número, Colonia, Ciudad" 
-                className="w-full border border-slate-200 p-3 rounded text-sm focus:ring-1 focus:ring-slate-900 outline-none" 
-                value={address} onChange={e => setAddress(e.target.value)} 
-              />
+            <div>
+              <h2 className="text-section-title text-ink">Datos de la sucursal</h2>
+              <p className="text-body text-muted">Captura los datos mínimos para registrar una nueva unidad de negocio.</p>
             </div>
           </div>
-          <div className="mt-8 flex flex-col sm:flex-row justify-between items-center bg-slate-50 p-4 rounded-lg border border-slate-100">
-            <p className="text-[10px] text-slate-400 flex items-center mb-4 sm:mb-0 font-bold uppercase tracking-tight">
-              <Lock className="w-4 h-4 mr-2" />
-              Sujeto a validación administrativa para inicio de operaciones
-            </p>
-            <div className="flex gap-4 w-full sm:w-auto">
-              <button type="button" onClick={() => setShowForm(false)} className="px-6 py-3 text-xs font-bold text-slate-500 hover:bg-slate-100 transition rounded uppercase tracking-widest">Descartar</button>
-              <button type="submit" className="bg-slate-900 text-white px-8 py-3 rounded font-bold text-xs hover:bg-black transition shadow-lg shadow-slate-200 uppercase tracking-widest">Crear Sucursal</button>
-            </div>
-          </div>
-        </form>
-      )}
 
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm divide-y divide-slate-100 overflow-hidden">
-        {clinics.map(clinic => (
+          <form onSubmit={handleCreate}>
+            <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-2">
+              <Input
+                required
+                label="Nombre comercial"
+                placeholder="Ej. Clínica Dental Central"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+              <Input
+                required
+                label="Dirección física completa"
+                placeholder="Calle, número, colonia, ciudad"
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-border bg-surface-muted px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="flex items-center gap-2 text-caption uppercase tracking-[0.16em] text-muted">
+                <Lock className="h-4 w-4" />
+                Sujeto a validación administrativa para inicio de operaciones
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+                  Descartar
+                </Button>
+                <Button type="submit">Crear sucursal</Button>
+              </div>
+            </div>
+          </form>
+        </Card>
+      ) : null}
+
+      <div className="space-y-4">
+        {clinics.map((clinic) => (
           <ClinicRow key={clinic.id} clinic={clinic} onUpdate={fetchClinics} />
         ))}
-        {clinics.length === 0 && (
-           <div className="p-24 text-center text-slate-400 opacity-40">
-             <Building className="mx-auto h-16 w-16 mb-4" />
-             <p className="font-bold uppercase tracking-[0.2em] text-[10px]">Sin unidades operativas registradas</p>
-           </div>
-        )}
+
+        {clinics.length === 0 ? (
+          <Card className="p-6">
+            <EmptyState
+              icon={Building}
+              title="Sin unidades operativas registradas"
+              description="Registra la primera sucursal para comenzar a distribuir consultorios y operación clínica."
+            />
+          </Card>
+        ) : null}
       </div>
     </div>
   );
@@ -125,15 +172,13 @@ function ClinicRow({ clinic, onUpdate }) {
   const [expanded, setExpanded] = useState(false);
   const [offices, setOffices] = useState([]);
   const [loadingOffices, setLoadingOffices] = useState(false);
-  
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
     name: clinic.name,
     address: clinic.address,
     phone: clinic.phone || '',
-    logo_url: clinic.logo_url || ''
+    logo_url: clinic.logo_url || '',
   });
-
   const [showAddOffice, setShowAddOffice] = useState(false);
   const [officeName, setOfficeName] = useState('');
   const [officeFloor, setOfficeFloor] = useState('');
@@ -143,15 +188,17 @@ function ClinicRow({ clinic, onUpdate }) {
     try {
       const res = await api.get(`/clinics/${clinic.id}/offices`);
       setOffices(res.data.data || []);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     } finally {
       setLoadingOffices(false);
     }
   };
 
   useEffect(() => {
-    if (expanded) fetchOffices();
+    if (expanded) {
+      fetchOffices();
+    }
   }, [expanded]);
 
   const handleUpdate = async () => {
@@ -160,7 +207,7 @@ function ClinicRow({ clinic, onUpdate }) {
         icon: 'warning',
         title: 'Teléfono inválido',
         text: 'El teléfono de atención debe contener entre 8 y 15 dígitos.',
-        confirmButtonColor: '#0f172a'
+        confirmButtonColor: '#0f172a',
       });
       return;
     }
@@ -168,29 +215,29 @@ function ClinicRow({ clinic, onUpdate }) {
     try {
       await api.patch(`/clinics/${clinic.id}`, {
         ...editData,
-        phone: editData.phone ? normalizePhone(editData.phone) : ''
+        phone: editData.phone ? normalizePhone(editData.phone) : '',
       });
       setIsEditing(false);
       await Swal.fire({
         icon: 'success',
-        title: 'Configuración Actualizada',
+        title: 'Configuración actualizada',
         text: 'Los datos de la sucursal han sido sincronizados correctamente.',
         confirmButtonColor: '#0f172a',
-        timer: 1500
+        timer: 1500,
       });
       onUpdate();
     } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'Error de Actualización',
+        title: 'Error de actualización',
         text: 'No se pudieron guardar los cambios en la sucursal.',
-        confirmButtonColor: '#0f172a'
+        confirmButtonColor: '#0f172a',
       });
     }
   };
 
-  const handleAddOffice = async (e) => {
-    e.preventDefault();
+  const handleAddOffice = async (event) => {
+    event.preventDefault();
     try {
       await api.post(`/clinics/${clinic.id}/offices`, { name: officeName, floor: officeFloor });
       setOfficeName('');
@@ -198,161 +245,216 @@ function ClinicRow({ clinic, onUpdate }) {
       setShowAddOffice(false);
       await Swal.fire({
         icon: 'success',
-        title: 'Área Registrada',
+        title: 'Área registrada',
         text: 'El nuevo consultorio ha sido añadido a la distribución de la sucursal.',
         confirmButtonColor: '#0f172a',
-        timer: 1500
+        timer: 1500,
       });
       fetchOffices();
-    } catch (err) {
+    } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'Error Operativo',
+        title: 'Error operativo',
         text: 'No se pudo registrar el consultorio en este momento.',
-        confirmButtonColor: '#0f172a'
+        confirmButtonColor: '#0f172a',
       });
     }
   };
 
   return (
-    <div className="flex flex-col">
-      <div className="p-6 flex justify-between items-center group">
-        <div className="flex items-center space-x-6 cursor-pointer flex-1" onClick={() => setExpanded(!expanded)}>
-          <div className="w-14 h-14 bg-white border border-slate-200 rounded flex items-center justify-center text-slate-300 overflow-hidden shadow-inner">
-             {clinic.logo_url ? (
-               <img src={clinic.logo_url} alt="Logo" className="w-full h-full object-contain p-1" />
-             ) : (
-               <Building className="w-6 h-6" />
-             )}
+    <Card className="overflow-hidden">
+      <div className="flex flex-col gap-4 border-b border-border bg-surface-muted px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="flex min-w-0 flex-1 items-center gap-4 text-left outline-none"
+        >
+          <div className="flex h-14 w-14 flex-none items-center justify-center overflow-hidden rounded-panel border border-border bg-surface text-muted shadow-soft">
+            {clinic.logo_url ? (
+              <img src={clinic.logo_url} alt="Logo de la sucursal" className="h-full w-full object-contain p-1" />
+            ) : (
+              <Building className="h-6 w-6" />
+            )}
           </div>
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">{clinic.name}</h3>
-            <div className="text-[11px] font-bold text-slate-400 flex items-center mt-1 uppercase tracking-widest">
-              <MapPin className="w-3 h-3 mr-2" /> {clinic.address}
+
+          <div className="min-w-0 space-y-1">
+            <h3 className="truncate text-section-title text-ink">{clinic.name}</h3>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-caption text-muted">
+              <span className="inline-flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                <span className="truncate">{clinic.address}</span>
+              </span>
+              <span className={`inline-flex items-center gap-2 rounded-control border px-3 py-1 ${clinic.status === 'ACTIVE' ? 'border-success-100 bg-success-50 text-success-600' : 'border-border bg-surface text-muted'}`}>
+                <span className={`h-2 w-2 rounded-full ${clinic.status === 'ACTIVE' ? 'bg-success-600' : 'bg-border'}`} />
+                {clinic.status === 'ACTIVE' ? 'Activa' : clinic.status}
+              </span>
             </div>
           </div>
-        </div>
-        <div className="flex items-center space-x-6">
-          <div className={`h-2 w-2 rounded-full ${clinic.status === 'ACTIVE' ? 'bg-emerald-500 shadow-emerald-200 shadow-md' : 'bg-slate-300'}`} title={clinic.status} />
-          <button 
-            onClick={() => setIsEditing(true)}
-            className="p-2 text-slate-400 hover:text-slate-900 transition-colors"
-          >
-            <Edit3 className="w-5 h-5" />
-          </button>
-          <button onClick={() => setExpanded(!expanded)} className="p-2 text-slate-400">
-            {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-          </button>
+        </button>
+
+        <div className="flex items-center justify-between gap-3 lg:justify-end">
+          <Button variant="secondary" size="sm" onClick={() => setIsEditing(true)}>
+            <Edit3 className="h-4 w-4" />
+            Editar
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setExpanded((current) => !current)}>
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
         </div>
       </div>
 
-      {isEditing && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[200] flex justify-center items-center p-4 overflow-y-auto">
-          <div className="bg-white rounded w-full max-w-xl shadow-2xl animate-in zoom-in-95 duration-200">
-             <div className="p-8 border-b border-slate-100 flex justify-between items-center">
-                <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-900 flex items-center">
-                  <Edit3 className="w-4 h-4 mr-3" /> Configuración de Sucursal
-                </h2>
-                <button onClick={() => setIsEditing(false)} className="text-slate-300 hover:text-slate-900"><X className="w-6 h-6" /></button>
-             </div>
-             <div className="p-8 space-y-6">
-                <div className="space-y-4">
-                   <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nombre de la Sucursal</label>
-                      <input className="w-full border border-slate-200 p-3 rounded text-sm font-bold" value={editData.name} onChange={e => setEditData({...editData, name: e.target.value})} />
-                   </div>
-                   <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dirección Comercial</label>
-                      <input className="w-full border border-slate-200 p-3 rounded text-sm font-bold" value={editData.address} onChange={e => setEditData({...editData, address: e.target.value})} />
-                   </div>
-                   <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Teléfono de Atención</label>
-                      <input className="w-full border border-slate-200 p-3 rounded text-sm font-bold" value={editData.phone} onChange={e => setEditData({...editData, phone: e.target.value})} />
-                   </div>
-                   <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Logo de la Clínica (URL)</label>
-                       <div className="flex gap-4">
-                          <input 
-                            className="flex-1 border border-slate-200 p-3 rounded text-[10px] font-mono" 
-                            placeholder="https://ejemplo.com/logo.png"
-                            value={editData.logo_url} 
-                            onChange={e => setEditData({...editData, logo_url: e.target.value})} 
-                          />
-                          <div className="w-12 h-12 bg-slate-50 border border-slate-200 rounded flex items-center justify-center text-slate-300 overflow-hidden">
-                             {editData.logo_url ? <img src={editData.logo_url} alt="P" className="w-full h-full object-contain p-1" /> : <ImageIcon className="w-5 h-5" />}
-                          </div>
-                       </div>
-                       <p className="text-[9px] text-slate-400 font-bold uppercase italic">Este logo aparecerá en el encabezado de las recetas digitales generadas por esta sucursal.</p>
-                   </div>
-                </div>
-                <div className="flex gap-4 pt-4">
-                   <button onClick={() => setIsEditing(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest hover:bg-slate-50 transition-all">Cancelar</button>
-                   <button onClick={handleUpdate} className="flex-1 py-4 bg-slate-900 text-white text-xs font-bold uppercase tracking-[0.2em] rounded shadow-lg shadow-slate-200 hover:bg-black transition-all flex items-center justify-center">
-                     <Save className="w-4 h-4 mr-2" /> Guardar Cambios
-                   </button>
-                </div>
-             </div>
-          </div>
-        </div>
-      )}
-
-      {expanded && (
-        <div className="bg-slate-50/50 border-t border-slate-100 p-8 animate-in fade-in slide-in-from-top-2">
-          {/* Distribución Interna Header */}
-          <div className="flex justify-between items-center mb-8 border-b border-slate-200 pb-4">
-             <div className="flex items-center space-x-3">
-                <div className="bg-slate-900 p-2 rounded text-white shadow-md">
-                   <Building2 className="w-3 h-3" />
-                </div>
-                <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em]">Distribución Operativa (Consultorios)</h4>
-             </div>
-             <button 
-                onClick={() => setShowAddOffice(!showAddOffice)}
-                className="text-[9px] font-black text-slate-600 border border-slate-300 bg-white hover:bg-slate-900 hover:text-white px-4 py-2 rounded transition-all uppercase tracking-widest shadow-sm"
-              >
-                Registrar Área
-              </button>
-          </div>
-
-          {showAddOffice && (
-            <form onSubmit={handleAddOffice} className="mb-8 bg-white p-8 rounded border border-slate-200 shadow-xl flex flex-col md:flex-row gap-6 items-end animate-in zoom-in-95 duration-200">
-               <div className="flex-1 w-full space-y-2">
-                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Identificador de Área *</label>
-                 <input required className="w-full border border-slate-200 rounded p-3 text-sm font-bold outline-none focus:ring-1 focus:ring-slate-900" placeholder="Ej. Unidad 1 / Box A" value={officeName} onChange={e => setOfficeName(e.target.value)} />
-               </div>
-               <div className="flex-1 w-full space-y-2">
-                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Nivel o Referencia</label>
-                 <input className="w-full border border-slate-200 rounded p-3 text-sm font-bold outline-none focus:ring-1 focus:ring-slate-900" placeholder="Ej. Primer Piso / Ala Norte" value={officeFloor} onChange={e => setOfficeFloor(e.target.value)} />
-               </div>
-               <div className="flex gap-2 w-full md:w-auto">
-                 <button type="button" onClick={() => setShowAddOffice(false)} className="px-6 py-3 text-[10px] font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest">Ocultar</button>
-                 <button type="submit" className="bg-slate-900 text-white font-black text-[10px] px-8 py-3 rounded hover:bg-black uppercase tracking-widest shadow-lg shadow-slate-200">Confirmar</button>
-               </div>
-            </form>
-          )}
-
-          {loadingOffices ? (
-            <div className="py-12 text-center text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">Sincronizando infraestructura...</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {offices.map(office => (
-                <div key={office.id} className="bg-white border border-slate-200 p-6 rounded shadow-sm hover:shadow-xl hover:border-slate-900 transition-all group relative">
-                  <div className="flex justify-between items-start mb-3">
-                    <h5 className="font-bold text-slate-900 group-hover:text-black transition-all text-sm">{office.name}</h5>
-                    <div className="h-1.5 w-1.5 bg-emerald-500 rounded-full" />
-                  </div>
-                  {office.floor && <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">{office.floor}</p>}
-                </div>
-              ))}
-              {offices.length === 0 && !showAddOffice && (
-                <div className="col-span-full py-16 text-center bg-slate-100/50 rounded-lg border-2 border-dashed border-slate-200">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] italic">Sin consultorios configurados en esta unidad</p>
-                </div>
-              )}
+      {expanded ? (
+        <div className="space-y-6 bg-surface-muted/40 p-6">
+          <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-ink">
+              <Building2 className="h-4 w-4" />
+              Distribución operativa
             </div>
-          )}
+            <Button variant="secondary" size="sm" onClick={() => setShowAddOffice((current) => !current)}>
+              <Plus className="h-4 w-4" />
+              Registrar área
+            </Button>
+          </div>
+
+          {showAddOffice ? (
+            <Card className="p-6">
+              <form onSubmit={handleAddOffice} className="space-y-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <Input
+                    required
+                    label="Identificador de área"
+                    placeholder="Ej. Unidad 1 / Box A"
+                    value={officeName}
+                    onChange={(event) => setOfficeName(event.target.value)}
+                  />
+                  <Input
+                    label="Nivel o referencia"
+                    placeholder="Ej. Primer piso / Ala norte"
+                    value={officeFloor}
+                    onChange={(event) => setOfficeFloor(event.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-wrap justify-end gap-3 border-t border-border pt-4">
+                  <Button type="button" variant="secondary" onClick={() => setShowAddOffice(false)}>
+                    Ocultar
+                  </Button>
+                  <Button type="submit">Confirmar</Button>
+                </div>
+              </form>
+            </Card>
+          ) : null}
+
+          <Card className="overflow-hidden">
+            <DataTable loading={loadingOffices}>
+              {offices.length === 0 ? (
+                <EmptyState
+                  icon={Building2}
+                  title="Sin consultorios configurados"
+                  description="Agrega consultorios para organizar la infraestructura de esta sucursal."
+                  className="m-6"
+                />
+              ) : (
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-surface">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">
+                        Consultorio
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">
+                        Nivel o referencia
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border bg-surface">
+                    {offices.map((office) => (
+                      <tr key={office.id} className="transition-colors hover:bg-surface-muted/60">
+                        <td className="px-6 py-4 align-top">
+                          <div className="space-y-1">
+                            <p className="font-medium text-ink">{office.name}</p>
+                            <p className="text-caption text-muted">Consultorio operativo</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 align-top text-sm text-muted">{office.floor || 'Sin referencia'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </DataTable>
+          </Card>
         </div>
-      )}
-    </div>
+      ) : null}
+
+      {isEditing ? (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-md">
+          <Card className="w-full max-w-xl overflow-hidden">
+            <div className="flex items-center justify-between gap-4 border-b border-border bg-surface-muted px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="rounded-panel bg-primary-50 p-2 text-primary-600">
+                  <Edit3 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-section-title text-ink">Configuración de sucursal</h2>
+                  <p className="text-body text-muted">Actualiza identidad, contacto y branding de la unidad.</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="p-6">
+              <div className="grid grid-cols-1 gap-6">
+                <Input
+                  label="Nombre de la sucursal"
+                  value={editData.name}
+                  onChange={(event) => setEditData({ ...editData, name: event.target.value })}
+                />
+                <Input
+                  label="Dirección comercial"
+                  value={editData.address}
+                  onChange={(event) => setEditData({ ...editData, address: event.target.value })}
+                />
+                <Input
+                  label="Teléfono de atención"
+                  value={editData.phone}
+                  onChange={(event) => setEditData({ ...editData, phone: event.target.value })}
+                  prefix={<Phone className="h-4 w-4" />}
+                />
+                <Input
+                  label="Logo de la clínica (URL)"
+                  placeholder="https://ejemplo.com/logo.png"
+                  value={editData.logo_url}
+                  onChange={(event) => setEditData({ ...editData, logo_url: event.target.value })}
+                />
+                <div className="flex items-center gap-4 rounded-panel border border-border bg-surface-muted p-4">
+                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-panel border border-border bg-surface text-muted">
+                    {editData.logo_url ? (
+                      <img src={editData.logo_url} alt="Vista previa del logo" className="h-full w-full object-contain p-1" />
+                    ) : (
+                      <ImageIcon className="h-5 w-5" />
+                    )}
+                  </div>
+                  <p className="text-caption text-muted">
+                    Este logo aparecerá en el encabezado de las recetas digitales generadas por esta sucursal.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-border pt-4">
+                <Button variant="secondary" onClick={() => setIsEditing(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleUpdate}>
+                  <Save className="h-4 w-4" />
+                  Guardar cambios
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+    </Card>
   );
 }
