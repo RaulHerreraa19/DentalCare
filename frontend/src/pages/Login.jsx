@@ -92,7 +92,7 @@ export default function Login() {
                 Interfaz calmada, tokenizada y pensada para trabajo administrativo continuo.
               </div>
             </div>
-          </div>
+          </Card>
         </div>
 
         <div className="flex items-center justify-center">
