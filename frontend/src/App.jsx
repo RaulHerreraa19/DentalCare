@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Layout, ProtectedRoute } from './components/Layout';
 
@@ -24,7 +24,6 @@ import Patients from './pages/reception/Patients';
 import Calendar from './pages/reception/Calendar';
 import DoctorSchedule from './pages/doctor/Schedule';
 import { useAuth } from './context/AuthContext';
-import MedicalRecordWizard from './pages/doctor/MedicalRecordWizard';
 import MedicalRecordsFollowup from './pages/doctor/MedicalRecordsFollowup';
 
 function DashboardRedirect() {
@@ -41,6 +40,14 @@ function DashboardRedirect() {
 
   const targetPath = roleDefaultRoutes[user.role] || '/login';
   return <Navigate to={targetPath} replace />;
+}
+
+function LegacyExpedientRedirect() {
+  const { patientId } = useParams();
+  const { search } = useLocation();
+
+  // Compatibilidad con links viejos: /doctor/expedient/:patientId -> /doctor/medical-records/:patientId
+  return <Navigate to={`/doctor/medical-records/${patientId}${search || ''}`} replace />;
 }
 
 function App() {
@@ -106,8 +113,8 @@ function App() {
           <Route path="/doctor/schedule" element={<ProtectedRoute allowedRoles={['DOCTOR']}><DoctorSchedule /></ProtectedRoute>} />
           <Route path="/doctor/dashboard" element={<ProtectedRoute allowedRoles={['DOCTOR']}><DoctorDashboard /></ProtectedRoute>} />
           <Route path="/doctor/medical-records/:patientId" element={<ProtectedRoute allowedRoles={['DOCTOR']}><MedicalRecordEditor /></ProtectedRoute>} />
-            <Route path="/doctor/expedient/:patientId" element={<ProtectedRoute allowedRoles={['DOCTOR']}><MedicalRecordWizard /></ProtectedRoute>} />
-            <Route path="/doctor/followup" element={<ProtectedRoute allowedRoles={['DOCTOR']}><MedicalRecordsFollowup /></ProtectedRoute>} />
+          <Route path="/doctor/expedient/:patientId" element={<ProtectedRoute allowedRoles={['DOCTOR']}><LegacyExpedientRedirect /></ProtectedRoute>} />
+          <Route path="/doctor/followup" element={<ProtectedRoute allowedRoles={['DOCTOR']}><MedicalRecordsFollowup /></ProtectedRoute>} />
           <Route path="/doctor/profile" element={<ProtectedRoute allowedRoles={['DOCTOR', 'OWNER']}><ProfileSettings /></ProtectedRoute>} />
           
           <Route path="/reception/patients" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'OWNER', 'DOCTOR']}><Patients /></ProtectedRoute>} />

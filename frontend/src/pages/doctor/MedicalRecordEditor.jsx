@@ -661,6 +661,7 @@ export default function MedicalRecordEditor() {
 
     const doc = iframe.contentWindow.document;
     const branding = p.appointment?.clinic || activeClinic;
+    const brandingLogoUrl = branding?.logo_url || branding?.organization?.logo_url || '';
 
     const html = `
       <!DOCTYPE html>
@@ -695,7 +696,7 @@ export default function MedicalRecordEditor() {
         </head>
         <body>
           <div class="header">
-            ${branding?.logo_url ? `<img src="${branding.logo_url}" class="logo" />` : '<div class="clinic-name">DentalCare</div>'}
+            ${brandingLogoUrl ? `<img src="${brandingLogoUrl}" class="logo" />` : '<div class="clinic-name">DentalCare</div>'}
             <div class="clinic-info">
               <p class="clinic-name">${branding?.name || 'DentalCare'}</p>
               <p class="clinic-detail">${branding?.address || 'Dirección no disponible'}</p>

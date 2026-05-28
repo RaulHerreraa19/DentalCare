@@ -46,24 +46,8 @@ class BillingService {
       true,
     );
 
-    console.log("collectPayment inputs:", {
-      finalAmount,
-      paymentMethod: normalizedPaymentMethod,
-      appointment_total_amount: appointment.total_amount,
-    });
     let actualAmount = parseFloat(appointment.total_amount || 0);
-    if (
-      finalAmount !== undefined &&
-      finalAmount !== null &&
-      finalAmount !== ""
-    ) {
-      console.log("finalAmount is truthy", finalAmount);
-      const parsed = parseFloat(finalAmount);
-      if (!isNaN(parsed)) {
-        actualAmount = parsed;
-      }
-    }
-    console.log("actualAmount finalized as:", actualAmount);
+
     return await db.$transaction(async (prisma) => {
       // 1. Marcar la cita como pagada y completada
       const updatedAppointment = await prisma.appointment.update({

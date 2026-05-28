@@ -20,12 +20,10 @@ class AppointmentsController {
         !start_time ||
         !end_time
       ) {
-        return res
-          .status(400)
-          .json({
-            status: "fail",
-            message: "Faltan datos obligatorios para crear la cita",
-          });
+        return res.status(400).json({
+          status: "fail",
+          message: "Faltan datos obligatorios para crear la cita",
+        });
       }
 
       const appointment = await AppointmentsService.createAppointment(
@@ -48,12 +46,10 @@ class AppointmentsController {
     try {
       const { clinic_id, start_date, end_date } = req.query;
       if (!start_date || !end_date) {
-        return res
-          .status(400)
-          .json({
-            status: "fail",
-            message: "Se requiere start_date y end_date",
-          });
+        return res.status(400).json({
+          status: "fail",
+          message: "Se requiere start_date y end_date",
+        });
       }
       const appointments = await AppointmentsService.getAppointmentsByClinic(
         req.user.organization_id,
@@ -79,10 +75,12 @@ class AppointmentsController {
 
       const appointment = await AppointmentsService.updateAppointmentStatus(
         req.user.organization_id,
+        req.user.id,
         id,
         status,
         cancel_reason,
         total_amount,
+        req.body.service_ids,
       );
       return ApiResponse.success(res, "Estado actualizado", appointment);
     } catch (error) {

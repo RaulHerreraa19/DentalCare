@@ -93,7 +93,13 @@ class AppointmentsService {
           select: { id: true, first_name: true, last_name: true, phone: true },
         },
         doctor: { select: { id: true, first_name: true, last_name: true } },
-        services: true,
+        services: {
+          include: {
+            service: {
+              select: { id: true, name: true, price: true },
+            },
+          },
+        },
       },
       orderBy: { start_time: "asc" },
     });
@@ -101,10 +107,12 @@ class AppointmentsService {
 
   static async updateAppointmentStatus(
     organizationId,
+    doctorId,
     appointmentId,
     status,
     cancelReason = null,
     totalAmount = null,
+    serviceIds = [],
   ) {
     const appointment = await db.appointment.findFirst({
       where: { id: appointmentId, organization_id: organizationId },
@@ -121,13 +129,52 @@ class AppointmentsService {
       updateData.total_amount = parseFloat(totalAmount);
     }
 
-    return await db.appointment.update({
-      where: { id: appointmentId },
-      data: updateData,
-      include: {
-        patient: { select: { first_name: true, last_name: true } },
-        doctor: { select: { first_name: true, last_name: true } },
-      },
+    return await db.$transaction(async (prisma) => {
+      if (Array.isArray(serviceIds) && serviceIds.length > 0) {
+        const selectedServices = await prisma.service.findMany({
+          where: {
+            id: { in: serviceIds },
+            doctor_id: doctorId,
+            is_active: true,
+          },
+        });
+
+        if (selectedServices.length !== serviceIds.length) {
+          throw new AppError(
+            "Uno o más servicios seleccionados no pertenecen a tu catálogo.",
+            400,
+          );
+        }
+
+        await prisma.appointmentService.deleteMany({
+          where: { appointment_id: appointmentId },
+        });
+
+        await prisma.appointmentService.createMany({
+          data: selectedServices.map((service) => ({
+            appointment_id: appointmentId,
+            service_id: service.id,
+            name: service.name,
+            price: service.price,
+          })),
+        });
+      }
+
+      return await prisma.appointment.update({
+        where: { id: appointmentId },
+        data: updateData,
+        include: {
+          patient: { select: { first_name: true, last_name: true } },
+          doctor: { select: { first_name: true, last_name: true } },
+          services: {
+            include: {
+              service: {
+                select: { id: true, name: true, price: true },
+              },
+            },
+          },
+        },
+      });
     });
   }
 }

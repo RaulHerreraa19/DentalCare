@@ -494,12 +494,12 @@ function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) 
 
 // ======================= MODAL DETALLES / COBRO (REDISEÑO FORMAL) =======================
 function BillingModal({ appointment, onClose, onSuccess }) {
-  const [finalAmount, setFinalAmount] = useState(appointment.total_amount || 0);
   const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const finalAmount = Number(appointment.total_amount || 0);
 
   const handlePayment = async () => {
     try {
-      await api.post(`/billing/collect/${appointment.id}`, { finalAmount, paymentMethod });
+      await api.post(`/billing/collect/${appointment.id}`, { paymentMethod });
       Swal.fire({
         icon: 'success',
         title: 'Pago Procesado',
@@ -591,20 +591,27 @@ function BillingModal({ appointment, onClose, onSuccess }) {
 
           {!appointment.is_paid && appointment.status !== 'CANCELLED' ? (
             <div className="space-y-4 bg-slate-50 p-6 rounded-lg border border-slate-100">
-               <div>
-                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Monto Neto a Liquidar</label>
-                 <div className="relative">
-                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                     <span className="text-slate-400 font-bold">$</span>
+               {appointment.services?.length > 0 && (
+                 <div className="space-y-2">
+                   <div className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Servicios aplicados</div>
+                   <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                     {appointment.services.map((serviceItem) => (
+                       <div key={serviceItem.id} className="flex items-center justify-between gap-3 rounded border border-slate-200 bg-white px-4 py-3 text-sm">
+                         <div className="min-w-0">
+                           <div className="font-bold text-slate-900 truncate">{serviceItem.name}</div>
+                           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Servicio profesional</div>
+                         </div>
+                         <div className="text-[11px] font-black text-slate-700">+${Number(serviceItem.price || 0).toFixed(2)}</div>
+                       </div>
+                     ))}
                    </div>
-                   <input 
-                     type="number" 
-                     className="w-full bg-white border border-slate-200 rounded p-3 text-2xl font-black text-slate-900 text-right focus:ring-1 focus:ring-slate-900 outline-none"
-                     value={finalAmount}
-                     onChange={(e) => setFinalAmount(e.target.value)}
-                   />
                  </div>
-                 {appointment.total_amount > 0 && <p className="text-[10px] text-slate-400 mt-2 text-center font-bold">PROPUESTA MÉDICA ORIGINAL: ${appointment.total_amount}</p>}
+               )}
+
+               <div className="rounded-lg border border-slate-200 bg-white p-4 text-center">
+                 <div className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Monto Neto a Liquidar</div>
+                 <div className="text-3xl font-black text-slate-900">${finalAmount.toFixed(2)}</div>
+                 <p className="text-[10px] text-slate-400 mt-2 text-center font-bold">Monto final bloqueado desde la consulta médica.</p>
                </div>
 
                <div>
@@ -628,7 +635,7 @@ function BillingModal({ appointment, onClose, onSuccess }) {
           ) : (
              <div className="text-center p-6 bg-slate-50 rounded-lg border border-slate-100 space-y-2">
                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Liquidado</div>
-               <div className="text-3xl font-black text-slate-900">${parseFloat(appointment.total_amount || 0).toFixed(2)}</div>
+               <div className="text-3xl font-black text-slate-900">${finalAmount.toFixed(2)}</div>
                {appointment.is_paid && <div className="text-[10px] font-bold text-emerald-600 flex items-center justify-center uppercase tracking-widest"><CheckCircle2 className="w-3 h-3 mr-1" /> Transacción Exitosa</div>}
              </div>
           )}

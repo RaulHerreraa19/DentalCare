@@ -1,5 +1,5 @@
-const db = require('../../config/database');
-const AppError = require('../../utils/AppError');
+const db = require("../../config/database");
+const AppError = require("../../utils/AppError");
 
 class PrescriptionService {
   /**
@@ -8,7 +8,7 @@ class PrescriptionService {
   static async createPrescription(doctorId, patientId, data) {
     // Validar existencia de médico y paciente
     const patient = await db.patient.findUnique({ where: { id: patientId } });
-    if (!patient) throw new AppError('Paciente no encontrado', 404);
+    if (!patient) throw new AppError("Paciente no encontrado", 404);
 
     return await db.prescription.create({
       data: {
@@ -16,16 +16,44 @@ class PrescriptionService {
         doctor_id: doctorId,
         appointment_id: data.appointment_id || null,
         medications: data.medications || [],
-        instructions: data.instructions || '',
+        instructions: data.instructions || "",
       },
       include: {
         doctor: {
-           select: { first_name: true, last_name: true, license_number: true, specialty: true, signature_stamp_url: true }
+          select: {
+            first_name: true,
+            last_name: true,
+            license_number: true,
+            specialty: true,
+            signature_stamp_url: true,
+          },
         },
         patient: {
-           select: { first_name: true, last_name: true, date_of_birth: true, gender: true }
-        }
-      }
+          select: {
+            first_name: true,
+            last_name: true,
+            date_of_birth: true,
+            gender: true,
+          },
+        },
+        appointment: {
+          include: {
+            clinic: {
+              select: {
+                name: true,
+                address: true,
+                phone: true,
+                logo_url: true,
+                organization: {
+                  select: {
+                    logo_url: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -37,20 +65,41 @@ class PrescriptionService {
       where: { patient_id: patientId },
       include: {
         doctor: {
-           select: { first_name: true, last_name: true, license_number: true, specialty: true, signature_stamp_url: true }
+          select: {
+            first_name: true,
+            last_name: true,
+            license_number: true,
+            specialty: true,
+            signature_stamp_url: true,
+          },
         },
         patient: {
-           select: { first_name: true, last_name: true, date_of_birth: true, gender: true }
+          select: {
+            first_name: true,
+            last_name: true,
+            date_of_birth: true,
+            gender: true,
+          },
         },
         appointment: {
           include: {
             clinic: {
-              select: { name: true, address: true, phone: true, logo_url: true }
-            }
-          }
-        }
+              select: {
+                name: true,
+                address: true,
+                phone: true,
+                logo_url: true,
+                organization: {
+                  select: {
+                    logo_url: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: "desc" },
     });
   }
 
@@ -62,28 +111,38 @@ class PrescriptionService {
       where: { id },
       include: {
         doctor: {
-           select: { 
-             first_name: true, 
-             last_name: true, 
-             license_number: true, 
-             specialty: true,
-             signature_stamp_url: true 
-           }
+          select: {
+            first_name: true,
+            last_name: true,
+            license_number: true,
+            specialty: true,
+            signature_stamp_url: true,
+          },
         },
         patient: {
-           select: { first_name: true, last_name: true, date_of_birth: true }
+          select: { first_name: true, last_name: true, date_of_birth: true },
         },
         appointment: {
-           include: {
-             clinic: {
-               select: { name: true, address: true, phone: true, logo_url: true }
-             }
-           }
-        }
-      }
+          include: {
+            clinic: {
+              select: {
+                name: true,
+                address: true,
+                phone: true,
+                logo_url: true,
+                organization: {
+                  select: {
+                    logo_url: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
-    if (!prescription) throw new AppError('Receta no encontrada', 404);
+    if (!prescription) throw new AppError("Receta no encontrada", 404);
     return prescription;
   }
 }

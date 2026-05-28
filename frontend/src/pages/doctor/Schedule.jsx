@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Clock, ChevronRight, CheckCircle, User, FileText, LayoutDashboard, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/axios';
@@ -156,8 +156,56 @@ export default function DoctorSchedule() {
 }
 
 function AttendModal({ appointment, onClose, onSuccess }) {
-  const [totalAmount, setTotalAmount] = useState(500);
+  const [baseAmount, setBaseAmount] = useState(500);
+  const [services, setServices] = useState([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchServices = async () => {
+      try {
+        const { data } = await api.get('/services');
+        if (mounted) {
+          setServices(data.data || []);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (mounted) {
+          setCatalogLoading(false);
+        }
+      }
+    };
+
+    fetchServices();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const selectedServices = useMemo(
+    () => services.filter((service) => selectedServiceIds.includes(service.id)),
+    [services, selectedServiceIds],
+  );
+
+  const servicesTotal = useMemo(
+    () => selectedServices.reduce((sum, service) => sum + Number(service.price || 0), 0),
+    [selectedServices],
+  );
+
+  const totalAmount = Number(baseAmount || 0) + servicesTotal;
+
+  const toggleService = (serviceId) => {
+    setSelectedServiceIds((current) => (
+      current.includes(serviceId)
+        ? current.filter((id) => id !== serviceId)
+        : [...current, serviceId]
+    ));
+  };
 
   const handleAttend = async (e) => {
     e.preventDefault();
@@ -165,7 +213,8 @@ function AttendModal({ appointment, onClose, onSuccess }) {
     try {
       await api.patch(`/appointments/${appointment.id}/status`, { 
         status: 'IN_PROGRESS', 
-        total_amount: totalAmount 
+        total_amount: totalAmount,
+        service_ids: selectedServiceIds,
       });
       onSuccess();
     } catch (error) {
@@ -189,23 +238,67 @@ function AttendModal({ appointment, onClose, onSuccess }) {
         </div>
         
         <form onSubmit={handleAttend} className="p-8 space-y-6">
-          <div className="bg-slate-50 p-6 rounded border border-slate-100">
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 text-center">Honorarios sugeridos a Recepción</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <span className="text-slate-400 font-bold">$</span>
+          <div className="bg-slate-50 p-6 rounded border border-slate-100 space-y-5">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 text-center">Honorario base de consulta</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <span className="text-slate-400 font-bold">$</span>
+                </div>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  required
+                  className="w-full bg-white border border-slate-200 rounded p-3 text-2xl font-black text-slate-900 text-right focus:ring-1 focus:ring-slate-900 outline-none"
+                  value={baseAmount}
+                  onChange={(e) => setBaseAmount(e.target.value)}
+                />
               </div>
-              <input 
-                type="number" 
-                step="0.01"
-                required
-                autofocus
-                className="w-full bg-white border border-slate-200 rounded p-3 text-2xl font-black text-slate-900 text-right focus:ring-1 focus:ring-slate-900 outline-none"
-                value={totalAmount}
-                onChange={(e) => setTotalAmount(e.target.value)}
-              />
             </div>
-            <p className="text-[9px] text-slate-400 mt-4 leading-relaxed text-center font-bold italic uppercase">Monto sujeto a confirmación por el personal administrativo al momento de liquidar en caja.</p>
+
+            <div className="space-y-3">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Servicios Profesionales</label>
+              {catalogLoading ? (
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center py-4">Cargando catálogo...</p>
+              ) : services.length > 0 ? (
+                <div className="max-h-44 overflow-y-auto space-y-2 pr-1">
+                  {services.map((service) => {
+                    const checked = selectedServiceIds.includes(service.id);
+                    return (
+                      <label key={service.id} className={`flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all ${checked ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-slate-900"
+                            checked={checked}
+                            onChange={() => toggleService(service.id)}
+                          />
+                          <div className="min-w-0">
+                            <div className="text-xs font-black uppercase tracking-widest truncate">{service.name}</div>
+                            <div className={`text-[10px] font-bold uppercase tracking-widest ${checked ? 'text-slate-200' : 'text-slate-400'}`}>Servicio adicional</div>
+                          </div>
+                        </div>
+                        <div className="text-xs font-black">+${parseFloat(service.price || 0).toFixed(2)}</div>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center py-4">No hay servicios activos en tu catálogo</p>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-center">
+              <div className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-1">Total estimado</div>
+              <div className="text-3xl font-black text-emerald-950">${Number(totalAmount || 0).toFixed(2)}</div>
+              {selectedServices.length > 0 && (
+                <div className="mt-2 text-[10px] font-bold text-emerald-700 uppercase tracking-widest">
+                  Base ${Number(baseAmount || 0).toFixed(2)} + Servicios ${servicesTotal.toFixed(2)}
+                </div>
+              )}
+            </div>
+
+            <p className="text-[9px] text-slate-400 leading-relaxed text-center font-bold italic uppercase">El total se enviará como monto final a recepción y no podrá alterarse ahí.</p>
           </div>
 
           <div className="flex gap-4 pt-4">
