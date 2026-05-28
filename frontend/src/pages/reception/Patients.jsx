@@ -40,6 +40,7 @@ export default function Patients() {
   const [totalPages, setTotalPages] = useState(1);
   const [errorMessage, setErrorMessage] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [editingPatient, setEditingPatient] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const { user } = useAuth();
@@ -53,7 +54,6 @@ export default function Patients() {
       mountedRef.current = false;
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [formData, setFormData] = useState({
@@ -70,7 +70,6 @@ export default function Patients() {
   useEffect(() => {
     // trigger initial load via central effect
     setPendingOp('initial');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Clear tenant-scoped data when user/organization changes to avoid cross-tenant leakage
@@ -82,7 +81,6 @@ export default function Patients() {
     setPage(1);
     setPendingOp('initial');
     setUnauthorized(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.organization_id]);
 
   const filteredPatients = useMemo(() => {
@@ -192,7 +190,27 @@ export default function Patients() {
     }
   };
 
-  const handleCreate = async (e) => {
+  const resetPatientModal = () => {
+    setShowModal(false);
+    setEditingPatient(null);
+    setFormData({ first_name: '', last_name: '', phone: '', email: '', date_of_birth: '', gender: '', address: '' });
+  };
+
+  const openEditModal = (patient) => {
+    setEditingPatient(patient);
+    setFormData({
+      first_name: patient.first_name || '',
+      last_name: patient.last_name || '',
+      phone: patient.phone || '',
+      email: patient.email || '',
+      date_of_birth: patient.date_of_birth ? String(patient.date_of_birth).slice(0, 10) : '',
+      gender: patient.gender || '',
+      address: patient.address || '',
+    });
+    setShowModal(true);
+  };
+
+  const handleSavePatient = async (e) => {
     e.preventDefault();
 
     const safeEmail = formData.email ? normalizeEmail(formData.email) : '';
@@ -206,16 +224,26 @@ export default function Patients() {
     }
 
     try {
-      await api.post('/patients', { ...formData, email: safeEmail, phone: normalizePhone(formData.phone) });
-      await Swal.fire({ icon: 'success', title: 'Paciente Registrado', text: 'El nuevo paciente ha sido dado de alta correctamente.', confirmButtonColor: '#0f172a', timer: 2000 });
+      if (editingPatient) {
+        await api.put(`/patients/${editingPatient.id}`, {
+          ...formData,
+          email: safeEmail,
+          phone: normalizePhone(formData.phone),
+        });
+        await Swal.fire({ icon: 'success', title: 'Paciente Actualizado', text: 'Los datos básicos del paciente fueron actualizados correctamente.', confirmButtonColor: '#0f172a', timer: 2000 });
+      } else {
+        await api.post('/patients', { ...formData, email: safeEmail, phone: normalizePhone(formData.phone) });
+        await Swal.fire({ icon: 'success', title: 'Paciente Registrado', text: 'El nuevo paciente ha sido dado de alta correctamente.', confirmButtonColor: '#0f172a', timer: 2000 });
+      }
+
       // deterministic reset: clear filters and go to first page; central effect will fetch
       setSearchTerm('');
       setDebouncedSearch('');
-      setPendingOp('create');
+      setPendingOp(editingPatient ? 'refresh' : 'create');
       setPage(1);
-      setFormData({ first_name: '', last_name: '', phone: '', email: '', date_of_birth: '', gender: '', address: '' });
+      resetPatientModal();
     } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error de Registro', text: error.response?.data?.message || 'No se pudo completar el registro.', confirmButtonColor: '#0f172a' });
+      Swal.fire({ icon: 'error', title: editingPatient ? 'Error de actualización' : 'Error de Registro', text: error.response?.data?.message || 'No se pudo completar la operación.', confirmButtonColor: '#0f172a' });
     }
   };
 
@@ -227,7 +255,6 @@ export default function Patients() {
       setPage(1);
     }, 300);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
   // Centralized fetch trigger — only this effect calls fetchPatients to avoid duplicates
@@ -236,7 +263,6 @@ export default function Patients() {
     fetchPatients({ resetPage: false, usePage: page, usePageSize: pageSize, op }).catch(() => {});
     // clear pending intent after dispatching
     setPendingOp(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, page, pageSize, pendingOp]);
 
   return (
@@ -299,7 +325,12 @@ export default function Patients() {
                   {user?.role === 'DOCTOR' ? (
                     <Button size="sm" variant="secondary" onClick={() => navigate(`/doctor/medical-records/${patient.id}`)}><FileText className="h-4 w-4" /> Expediente</Button>
                   ) : (
-                    <Button size="sm" variant="ghost" disabled>Solo lectura</Button>
+                    <div className="flex items-center justify-end gap-2">
+                      {(user?.role === 'RECEPTIONIST' || user?.role === 'OWNER') ? (
+                        <Button size="sm" variant="secondary" onClick={() => openEditModal(patient)}>Editar datos</Button>
+                      ) : null}
+                      <Button size="sm" variant="ghost" disabled>Solo lectura</Button>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -327,10 +358,10 @@ export default function Patients() {
         </div>
       </div>
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Registro de Paciente" description="Da de alta un paciente con validación básica de contacto." size="lg" footer={(
-        <div className="flex items-center justify-end gap-3"><Button type="button" variant="secondary" onClick={() => setShowModal(false)}>Descartar</Button><Button type="submit" form="patient-create-form">Dar de Alta</Button></div>
+      <Modal open={showModal} onClose={resetPatientModal} title={editingPatient ? 'Editar Paciente' : 'Registro de Paciente'} description={editingPatient ? 'Edita los datos básicos del paciente.' : 'Da de alta un paciente con validación básica de contacto.'} size="lg" footer={(
+        <div className="flex items-center justify-end gap-3"><Button type="button" variant="secondary" onClick={resetPatientModal}>Descartar</Button><Button type="submit" form="patient-create-form">{editingPatient ? 'Guardar cambios' : 'Dar de Alta'}</Button></div>
       )}>
-        <form id="patient-create-form" onSubmit={handleCreate} className="space-y-section">
+        <form id="patient-create-form" onSubmit={handleSavePatient} className="space-y-section">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Input label="Nombres" required value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} />
             <Input label="Apellidos" required value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} />
