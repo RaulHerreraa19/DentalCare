@@ -347,8 +347,9 @@ export default function ProfileSettings() {
 
         </div>
       </div>
+      </div>
     </div>
-  );
+    );
 }
 
 const X = ({ className }) => <Trash className={`${className}`} />; 
