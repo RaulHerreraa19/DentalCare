@@ -10,6 +10,7 @@ import {
   EmptyState,
   Input,
   KPIStatCard,
+  LoadingScreen,
   SectionHeader,
   SelectControl,
 } from '../../components/ui';
@@ -195,14 +196,7 @@ export default function OwnerTeam() {
   const receptionistCount = employees.filter((user) => user.role === 'RECEPTIONIST').length;
 
   if (loading && employees.length === 0) {
-    return (
-      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
-        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
-          <UserCheck className="h-5 w-5 animate-pulse text-primary-600" />
-          Cargando personal...
-        </Card>
-      </div>
-    );
+    return <LoadingScreen title="Cargando personal" description="Sincronizando equipo y sucursales" />;
   }
 
   return (

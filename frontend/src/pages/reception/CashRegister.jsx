@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import api from '../../lib/axios';
 import Swal from 'sweetalert2';
+import { LoadingScreen } from '../../components/ui';
 import {
   Button,
   Card,
@@ -169,6 +170,10 @@ export default function CashRegister() {
       });
     }
   };
+
+  if (loading) {
+    return <LoadingScreen title="Cargando caja" description="Sincronizando movimientos y saldos" />;
+  }
 
   return (
     <DashboardSectionLayout

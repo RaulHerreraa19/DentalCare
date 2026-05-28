@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { isValidPhone, normalizePhone } from '../../lib/validators';
-import { Button, Card, DataTable, EmptyState, Input, SectionHeader } from '../../components/ui';
+import { Button, Card, DataTable, EmptyState, Input, LoadingScreen, SectionHeader } from '../../components/ui';
 
 export default function OwnerClinics() {
   const [clinics, setClinics] = useState([]);
@@ -64,14 +64,7 @@ export default function OwnerClinics() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
-        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
-          <Building2 className="h-5 w-5 animate-pulse text-primary-600" />
-          Sincronizando centros...
-        </Card>
-      </div>
-    );
+    return <LoadingScreen title="Cargando sucursales" description="Sincronizando centros operativos" />;
   }
 
   const activeClinics = clinics.filter((clinic) => clinic.status === 'ACTIVE').length;

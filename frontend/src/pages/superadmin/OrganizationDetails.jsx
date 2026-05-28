@@ -21,6 +21,7 @@ import {
   DataTable,
   EmptyState,
   KPIStatCard,
+  LoadingScreen,
   SectionHeader,
 } from '../../components/ui';
 
@@ -51,14 +52,7 @@ export default function OrganizationDetails() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
-        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
-          <LayoutDashboard className="h-5 w-5 animate-pulse text-primary-600" />
-          Cargando detalles del negocio...
-        </Card>
-      </div>
-    );
+    return <LoadingScreen title="Cargando detalles del negocio" description="Sincronizando sucursales, usuarios y métricas" />;
   }
 
   if (!org) {

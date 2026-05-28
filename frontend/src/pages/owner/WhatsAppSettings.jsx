@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MessageCircle, Play, RefreshCw, Save, ShieldCheck } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../lib/axios';
-import { Button, Card, Input, SectionHeader } from '../../components/ui';
+import { Button, Card, Input, LoadingScreen, SectionHeader } from '../../components/ui';
 
 const defaultConfig = {
   enabled: false,
@@ -184,14 +184,7 @@ export default function WhatsAppSettings() {
       : 'border-danger-100 bg-danger-50 text-danger-600';
 
   if (loading) {
-    return (
-      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
-        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
-          <RefreshCw className="h-5 w-5 animate-spin text-primary-600" />
-          Cargando configuración WhatsApp...
-        </Card>
-      </div>
-    );
+    return <LoadingScreen title="Cargando configuración WhatsApp" description="Sincronizando recordatorios y estado operativo" />;
   }
 
   return (

@@ -193,7 +193,7 @@ export default function ProfileSettings() {
           </p>
         </div>
       </div>
-
+  import { Button, Card, Input, LoadingScreen } from '../../components/ui';
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         
         {/* Lado Izquierdo: Datos Profesionales (8/12) */}
@@ -243,7 +243,7 @@ export default function ProfileSettings() {
                  <div className="flex items-center space-x-3">
                     <div className="bg-emerald-500 p-2 rounded-xl text-white"><BadgeCheck className="w-5 h-5" /></div>
                     <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">Panel de Firma Autógrafa</h2>
-                 </div>
+              if (loading) return <LoadingScreen title="Cargando utilerías de identidad" description="Sincronizando perfil, firmas y sucursales" />;
                  <p className="text-[9px] font-bold text-slate-400 italic">Manten presion el mouse para dibujar</p>
               </div>
 

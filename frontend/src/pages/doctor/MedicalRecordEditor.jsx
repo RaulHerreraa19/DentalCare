@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../lib/axios';
 import Swal from 'sweetalert2';
 import OdontogramVisualizer, { normalizeOdontogramRecords } from '../../components/odontogram/OdontogramVisualizer';
+import { LoadingScreen } from '../../components/ui';
 import {
   User,
   FileText,
@@ -860,14 +861,7 @@ export default function MedicalRecordEditor() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center space-y-4">
-          <Activity className="w-12 h-12 text-slate-900 animate-spin mx-auto" />
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Sincronizando expediente...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen title="Cargando expediente" description="Sincronizando historia clínica y cita activa" />;
   }
 
   return (

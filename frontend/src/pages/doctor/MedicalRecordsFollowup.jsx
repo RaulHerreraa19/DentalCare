@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/axios';
 import Swal from 'sweetalert2';
+import { LoadingScreen } from '../../components/ui';
 import {
   FileText,
   Users,
@@ -117,14 +118,7 @@ export default function MedicalRecordsFollowup() {
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="text-center">
-          <Clock size={48} className="mx-auto mb-4 text-blue-600 animate-spin" />
-          <p>Cargando expedientes...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen title="Cargando expedientes" description="Sincronizando historial clínico" />;
   }
 
   return (

@@ -81,7 +81,7 @@ class AppointmentsService {
       // If string already contains a timezone designator (Z or +HH:MM/-HH:MM), keep it.
       if (/[zZ]|[+\-]\d{2}:\d{2}$/.test(s)) return new Date(s);
       // Otherwise, append Z to force UTC interpretation.
-      return new Date(s + 'Z');
+      return new Date(s + "Z");
     };
 
     const start = normalizeToUTC(startDate);
@@ -99,8 +99,8 @@ class AppointmentsService {
     if (options.doctorId) whereClause.doctor_id = options.doctorId;
 
     const orderBy = [
-      { start_time: options.sortDir === 'desc' ? 'desc' : 'asc' },
-      { id: 'asc' },
+      { start_time: options.sortDir === "desc" ? "desc" : "asc" },
+      { id: "asc" },
     ];
 
     // If pagination requested, return paginated contract
@@ -114,10 +114,19 @@ class AppointmentsService {
       const items = await db.appointment.findMany({
         where: whereClause,
         include: {
-          patient: { select: { id: true, first_name: true, last_name: true, phone: true } },
+          patient: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              phone: true,
+            },
+          },
           doctor: { select: { id: true, first_name: true, last_name: true } },
           services: {
-            include: { service: { select: { id: true, name: true, price: true } } },
+            include: {
+              service: { select: { id: true, name: true, price: true } },
+            },
           },
           clinic: { select: { id: true, name: true } },
         },
@@ -160,7 +169,15 @@ class AppointmentsService {
     const appointment = await db.appointment.findFirst({
       where: { id: appointmentId, organization_id: organizationId },
       include: {
-        patient: { select: { id: true, first_name: true, last_name: true, phone: true, organization_id: true } },
+        patient: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            phone: true,
+            organization_id: true,
+          },
+        },
         doctor: { select: { id: true, first_name: true, last_name: true } },
         services: {
           include: {
@@ -203,7 +220,7 @@ class AppointmentsService {
     return await db.$transaction(async (prisma) => {
       if (Array.isArray(serviceIds) && serviceIds.length > 0) {
         let selectedServices;
-        if (userRole === 'DOCTOR') {
+        if (userRole === "DOCTOR") {
           // doctors can only select services in their own catalog
           selectedServices = await prisma.service.findMany({
             where: {

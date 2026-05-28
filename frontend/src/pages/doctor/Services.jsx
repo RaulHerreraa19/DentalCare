@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../../lib/axios';
 import { Plus, Settings, Trash2, ListChecks, DollarSign } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { LoadingScreen } from '../../components/ui';
 
 export default function DoctorServices() {
   const [services, setServices] = useState([]);
@@ -83,7 +84,7 @@ export default function DoctorServices() {
     }
   };
 
-  if (loading && services.length === 0) return <div className="p-8 text-slate-600 font-medium italic text-center">Cargando catálogo profesional...</div>;
+  if (loading && services.length === 0) return <LoadingScreen title="Cargando catálogo profesional" description="Sincronizando servicios activos" />;
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto px-4 py-12 animate-in fade-in duration-500">

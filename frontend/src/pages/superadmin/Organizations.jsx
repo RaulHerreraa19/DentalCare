@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Building2, Plus, Search } from 'lucide-react';
 import api from '../../lib/axios';
-import { Button, Card, DataTable, EmptyState, Input, SectionHeader } from '../../components/ui';
+import { Button, Card, DataTable, EmptyState, Input, LoadingScreen, SectionHeader } from '../../components/ui';
 
 export default function Organizations() {
   const [organizations, setOrganizations] = useState([]);
@@ -39,14 +39,7 @@ export default function Organizations() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
-        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
-          <Building2 className="h-5 w-5 animate-pulse text-primary-600" />
-          Cargando negocios...
-        </Card>
-      </div>
-    );
+    return <LoadingScreen title="Cargando negocios" description="Sincronizando organizaciones" />;
   }
 
   return (

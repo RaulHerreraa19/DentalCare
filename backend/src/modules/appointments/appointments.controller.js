@@ -65,9 +65,9 @@ class AppointmentsController {
       const options = {
         doctorId: doctor_id || undefined,
         page: page ? parseInt(page, 10) : undefined,
-        pageSize: pageSize ? parseInt(pageSize, 10) : (page ? 50 : undefined),
-        sortBy: sortBy || 'start_time',
-        sortDir: sortDir || 'asc',
+        pageSize: pageSize ? parseInt(pageSize, 10) : page ? 50 : undefined,
+        sortBy: sortBy || "start_time",
+        sortDir: sortDir || "asc",
       };
 
       const appointments = await AppointmentsService.getAppointmentsByClinic(
