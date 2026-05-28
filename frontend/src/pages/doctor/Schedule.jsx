@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../lib/axios';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
+import { LoadingScreen } from '../../components/ui';
 
 export default function DoctorSchedule() {
   const [appointments, setAppointments] = useState([]);
@@ -88,7 +89,9 @@ export default function DoctorSchedule() {
     setShowAttendModal(true);
   };
 
-  if (loading && clinics.length === 0) return <div className="p-8 text-slate-600 font-medium italic">Sincronizando agenda médica...</div>;
+  if (loading && clinics.length === 0) {
+    return <LoadingScreen title="Cargando agenda médica" description="Sincronizando citas del doctor" />;
+  }
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto px-4 py-8 animate-in fade-in duration-500">

@@ -8,3 +8,4 @@ export { default as Input } from "./Input";
 export { default as Modal } from "./Modal";
 export { default as SectionHeader } from "./SectionHeader";
 export { default as SelectControl } from "./SelectControl";
+export { default as LoadingScreen } from "./LoadingScreen";

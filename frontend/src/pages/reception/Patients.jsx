@@ -16,6 +16,7 @@ import {
   Modal,
   SelectControl,
 } from '../../components/ui';
+import { LoadingScreen } from '../../components/ui';
 
 const genderOptions = [
   { value: '', label: 'Seleccionar...' },
@@ -266,6 +267,7 @@ export default function Patients() {
   }, [debouncedSearch, page, pageSize, pendingOp]);
 
   return (
+    initialLoading && patients.length === 0 ? <LoadingScreen title="Cargando pacientes" description="Sincronizando directorio clínico" /> : (
     <DashboardSectionLayout
       eyebrow="Recepción"
       title="Directorio de Pacientes"
@@ -381,5 +383,6 @@ export default function Patients() {
         </form>
       </Modal>
     </DashboardSectionLayout>
+    )
   );
 }

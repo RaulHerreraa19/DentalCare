@@ -7,11 +7,14 @@ import api from '../../lib/axios';
 import { Calendar as CalendarIcon, Filter, MapPin, User, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
+import { LoadingScreen } from '../../components/ui';
 
 export default function Calendar() {
   const [appointments, setAppointments] = useState([]);
   const [clinics, setClinics] = useState([]);
   const [selectedClinic, setSelectedClinic] = useState('');
+  const [clinicsLoading, setClinicsLoading] = useState(true);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showBillingModal, setShowBillingModal] = useState(false);
@@ -50,11 +53,14 @@ export default function Calendar() {
       }
     } catch (error) {
       console.error(error);
+    } finally {
+      setClinicsLoading(false);
     }
   };
 
   const fetchAppointments = async ({ signal, mountedRef } = {}) => {
     try {
+      setAppointmentsLoading(true);
       const today = new Date();
       // build UTC range: start at first day of previous month 00:00:00.000Z, end at last day of next month 23:59:59.999Z
       const startDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1, 0, 0, 0, 0));
@@ -81,6 +87,8 @@ export default function Calendar() {
       }
     } catch (error) {
       console.error(error);
+    } finally {
+      if (!mountedRef || mountedRef.mountedRef()) setAppointmentsLoading(false);
     }
   };
 
@@ -112,6 +120,7 @@ export default function Calendar() {
   }));
 
   return (
+    clinicsLoading || appointmentsLoading ? <LoadingScreen title="Cargando calendario operativo" description="Sincronizando clínicas y citas" /> : (
     <div className="p-8 h-screen flex flex-col bg-slate-50 space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -191,6 +200,7 @@ export default function Calendar() {
         />
       )}
     </div>
+    )
   );
 }
 

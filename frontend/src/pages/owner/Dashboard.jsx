@@ -22,6 +22,7 @@ import {
   Input,
   SectionHeader,
   SelectControl,
+  LoadingScreen,
 } from '../../components/ui';
 
 const periodOptions = [
@@ -138,11 +139,7 @@ export default function OwnerDashboard() {
   const timelineMax = Math.max(...reportTimeline.map((item) => item.total_income), 1);
 
   if (!stats && loading) {
-    return (
-      <div className="mx-auto max-w-7xl px-layout py-layout">
-        <Card className="p-6 text-body text-muted">Sincronizando tablero corporativo...</Card>
-      </div>
-    );
+    return <LoadingScreen title="Cargando tablero corporativo" description="Sincronizando métricas y sucursales" />;
   }
 
   return (

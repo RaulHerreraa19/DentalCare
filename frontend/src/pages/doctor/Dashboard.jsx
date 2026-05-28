@@ -3,6 +3,7 @@ import { Calendar, Users, Activity, Clock, ChevronRight } from 'lucide-react';
 import api from '../../lib/axios';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { LoadingScreen } from '../../components/ui';
 
 export default function DoctorDashboard() {
   const [stats, setStats] = useState({
@@ -77,7 +78,9 @@ export default function DoctorDashboard() {
     };
   }, []);
 
-  if (appointmentsLoading) return <div className="p-8">Cargando dashboard...</div>;
+  if (appointmentsLoading || patientsLoading) {
+    return <LoadingScreen title="Cargando panel del doctor" description="Sincronizando citas y pacientes" />;
+  }
 
   return (
     <div className="space-y-8">

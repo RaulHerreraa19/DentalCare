@@ -10,6 +10,7 @@ import {
   EmptyState,
   KPIStatCard,
   SectionHeader,
+  LoadingScreen,
 } from '../../components/ui';
 
 export default function SuperAdminDashboard() {
@@ -73,14 +74,7 @@ export default function SuperAdminDashboard() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-layout py-layout">
-        <Card className="flex items-center gap-3 px-6 py-5 text-body text-muted">
-          <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
-          Sincronizando panel global...
-        </Card>
-      </div>
-    );
+    return <LoadingScreen title="Cargando panel global" description="Sincronizando negocios y activaciones" />;
   }
 
   const organizationCount = data.organizations.length;
