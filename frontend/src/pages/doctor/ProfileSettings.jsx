@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import api from '../../lib/axios';
 import Swal from 'sweetalert2';
+import { Button, Card, Input, LoadingScreen } from '../../components/ui';
 
 const dataURLToBlob = (dataURL) => {
   const [meta, base64] = dataURL.split(',');
@@ -178,7 +179,7 @@ export default function ProfileSettings() {
     }
   };
 
-  if (loading) return <div className="p-12 text-slate-400 font-black uppercase text-xs animate-pulse">Cargando Utilerías...</div>;
+  if (loading) return <LoadingScreen title="Cargando utilerías de identidad" description="Sincronizando perfil, firmas y sucursales" />;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-12 animate-in fade-in duration-700">
@@ -192,9 +193,8 @@ export default function ProfileSettings() {
             Configuración de credenciales médicas y branding institucional
           </p>
         </div>
-      </div>
-  import { Button, Card, Input, LoadingScreen } from '../../components/ui';
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         
         {/* Lado Izquierdo: Datos Profesionales (8/12) */}
         <div className="lg:col-span-12 xl:col-span-8 space-y-8">
@@ -239,13 +239,12 @@ export default function ProfileSettings() {
 
            {/* 2. Panel de Firma Electrónica */}
            <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
-                 <div className="flex items-center space-x-3">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center space-x-3">
                     <div className="bg-emerald-500 p-2 rounded-xl text-white"><BadgeCheck className="w-5 h-5" /></div>
                     <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">Panel de Firma Autógrafa</h2>
-              if (loading) return <LoadingScreen title="Cargando utilerías de identidad" description="Sincronizando perfil, firmas y sucursales" />;
-                 <p className="text-[9px] font-bold text-slate-400 italic">Manten presion el mouse para dibujar</p>
-              </div>
+                  <p className="text-[9px] font-bold text-slate-400 italic">Manten presion el mouse para dibujar</p>
+                </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
                  <div className="space-y-4">
