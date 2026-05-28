@@ -225,17 +225,31 @@ export default function MedicalRecordWizard() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadPatientData();
+    let mounted = true;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        await loadPatientData({ signal: controller.signal, mountedRef: { mountedRef: () => mounted } });
+      } catch (e) {
+        /* ignore */
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
   }, [patientId, appointmentId]);
 
-  const loadPatientData = async () => {
+  const loadPatientData = async ({ signal, mountedRef } = {}) => {
     try {
       const [patientRes, recordRes, consentsRes] = await Promise.all([
-        api.get(`/patients/${patientId}`),
-        api.get(`/medical-records/${patientId}`),
-        api.get(`/medical-records/${patientId}/consents`)
+        api.get(`/patients/${patientId}`, { signal }),
+        api.get(`/medical-records/${patientId}`, { signal }),
+        api.get(`/medical-records/${patientId}/consents`, { signal })
       ]);
-      
+
+      if (mountedRef && !mountedRef.mountedRef()) return;
       setPatient(patientRes.data.data);
       if (recordRes.data.data) {
         setRecord(normalizeRecord(recordRes.data.data));
@@ -262,6 +276,7 @@ export default function MedicalRecordWizard() {
         }
         return acc;
       }, JSON.parse(JSON.stringify(EMPTY_CONSENTS_STATE)));
+      if (mountedRef && !mountedRef.mountedRef()) return;
       setBaselineConsents(latestConsents);
       setConsents(Object.keys(latestConsents).reduce((acc, key) => {
         acc[key] = latestConsents[key].accepted;
@@ -269,7 +284,8 @@ export default function MedicalRecordWizard() {
       }, {}));
 
       if (appointmentId) {
-        const appointmentRes = await api.get(`/appointments/${appointmentId}`);
+        const appointmentRes = await api.get(`/appointments/${appointmentId}`, { signal });
+        if (mountedRef && !mountedRef.mountedRef()) return;
         setAppointment(appointmentRes.data.data);
         if (appointmentRes.data.data?.session_note) {
           setRecord(prev => ({
@@ -279,9 +295,12 @@ export default function MedicalRecordWizard() {
         }
       }
 
+      if (mountedRef && !mountedRef.mountedRef()) return;
       setLoading(false);
     } catch (error) {
+      if (error.name === 'AbortError') return;
       Swal.fire('Error', error.response?.data?.message || 'Error al cargar datos', 'error');
+      if (mountedRef && !mountedRef.mountedRef()) return;
       setLoading(false);
     }
   };

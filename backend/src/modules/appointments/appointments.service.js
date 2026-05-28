@@ -73,19 +73,69 @@ class AppointmentsService {
     clinicId,
     startDate,
     endDate,
+    options = {},
   ) {
+    // Normalize dates as UTC. If incoming date strings lack timezone info, treat as UTC.
+    const normalizeToUTC = (s) => {
+      if (!s) return null;
+      // If string already contains a timezone designator (Z or +HH:MM/-HH:MM), keep it.
+      if (/[zZ]|[+\-]\d{2}:\d{2}$/.test(s)) return new Date(s);
+      // Otherwise, append Z to force UTC interpretation.
+      return new Date(s + 'Z');
+    };
+
+    const start = normalizeToUTC(startDate);
+    const end = normalizeToUTC(endDate);
+
     const whereClause = {
       organization_id: organizationId,
       start_time: {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
+        gte: start,
+        lte: end,
       },
     };
 
-    if (clinicId) {
-      whereClause.clinic_id = clinicId;
+    if (clinicId) whereClause.clinic_id = clinicId;
+    if (options.doctorId) whereClause.doctor_id = options.doctorId;
+
+    const orderBy = [
+      { start_time: options.sortDir === 'desc' ? 'desc' : 'asc' },
+      { id: 'asc' },
+    ];
+
+    // If pagination requested, return paginated contract
+    if (options.page && options.pageSize) {
+      const page = Math.max(1, options.page);
+      const pageSize = Math.max(1, Math.min(500, options.pageSize));
+
+      const total = await db.appointment.count({ where: whereClause });
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+      const items = await db.appointment.findMany({
+        where: whereClause,
+        include: {
+          patient: { select: { id: true, first_name: true, last_name: true, phone: true } },
+          doctor: { select: { id: true, first_name: true, last_name: true } },
+          services: {
+            include: { service: { select: { id: true, name: true, price: true } } },
+          },
+          clinic: { select: { id: true, name: true } },
+        },
+        orderBy,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      });
+
+      return {
+        items,
+        page,
+        pageSize,
+        total,
+        totalPages,
+      };
     }
 
+    // Legacy behavior: return array
     return await db.appointment.findMany({
       where: whereClause,
       include: {
@@ -100,14 +150,35 @@ class AppointmentsService {
             },
           },
         },
+        clinic: { select: { id: true, name: true } },
       },
-      orderBy: { start_time: "asc" },
+      orderBy,
     });
+  }
+
+  static async getAppointmentById(organizationId, appointmentId) {
+    const appointment = await db.appointment.findFirst({
+      where: { id: appointmentId, organization_id: organizationId },
+      include: {
+        patient: { select: { id: true, first_name: true, last_name: true, phone: true, organization_id: true } },
+        doctor: { select: { id: true, first_name: true, last_name: true } },
+        services: {
+          include: {
+            service: { select: { id: true, name: true, price: true } },
+          },
+        },
+        clinic: { select: { id: true, name: true } },
+      },
+    });
+
+    if (!appointment) throw new AppError("Cita no encontrada.", 404);
+    return appointment;
   }
 
   static async updateAppointmentStatus(
     organizationId,
     doctorId,
+    userRole,
     appointmentId,
     status,
     cancelReason = null,
@@ -131,17 +202,29 @@ class AppointmentsService {
 
     return await db.$transaction(async (prisma) => {
       if (Array.isArray(serviceIds) && serviceIds.length > 0) {
-        const selectedServices = await prisma.service.findMany({
-          where: {
-            id: { in: serviceIds },
-            doctor_id: doctorId,
-            is_active: true,
-          },
-        });
+        let selectedServices;
+        if (userRole === 'DOCTOR') {
+          // doctors can only select services in their own catalog
+          selectedServices = await prisma.service.findMany({
+            where: {
+              id: { in: serviceIds },
+              doctor_id: doctorId,
+              is_active: true,
+            },
+          });
+        } else {
+          // owners/receptionists: allow any active services (no doctor_id restriction)
+          selectedServices = await prisma.service.findMany({
+            where: {
+              id: { in: serviceIds },
+              is_active: true,
+            },
+          });
+        }
 
         if (selectedServices.length !== serviceIds.length) {
           throw new AppError(
-            "Uno o más servicios seleccionados no pertenecen a tu catálogo.",
+            "Uno o más servicios seleccionados no están disponibles o no están activos.",
             400,
           );
         }

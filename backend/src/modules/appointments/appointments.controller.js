@@ -44,20 +44,54 @@ class AppointmentsController {
 
   static async getAppointments(req, res, next) {
     try {
-      const { clinic_id, start_date, end_date } = req.query;
+      const {
+        clinic_id,
+        start_date,
+        end_date,
+        doctor_id,
+        page,
+        pageSize,
+        sortBy,
+        sortDir,
+      } = req.query;
+
       if (!start_date || !end_date) {
         return res.status(400).json({
           status: "fail",
           message: "Se requiere start_date y end_date",
         });
       }
+
+      const options = {
+        doctorId: doctor_id || undefined,
+        page: page ? parseInt(page, 10) : undefined,
+        pageSize: pageSize ? parseInt(pageSize, 10) : (page ? 50 : undefined),
+        sortBy: sortBy || 'start_time',
+        sortDir: sortDir || 'asc',
+      };
+
       const appointments = await AppointmentsService.getAppointmentsByClinic(
         req.user.organization_id,
         clinic_id,
         start_date,
         end_date,
+        options,
       );
+
       return ApiResponse.success(res, "Citas obtenidas", appointments);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getAppointmentById(req, res, next) {
+    try {
+      const { id } = req.params;
+      const appointment = await AppointmentsService.getAppointmentById(
+        req.user.organization_id,
+        id,
+      );
+      return ApiResponse.success(res, "Cita obtenida", appointment);
     } catch (error) {
       next(error);
     }
@@ -76,6 +110,7 @@ class AppointmentsController {
       const appointment = await AppointmentsService.updateAppointmentStatus(
         req.user.organization_id,
         req.user.id,
+        req.user.role,
         id,
         status,
         cancel_reason,

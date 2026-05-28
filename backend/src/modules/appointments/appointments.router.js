@@ -8,6 +8,7 @@ router.use(protect);
 
 router.post('/', AppointmentsController.createAppointment);
 router.get('/', AppointmentsController.getAppointments);
+router.get('/:id', AppointmentsController.getAppointmentById);
 router.patch('/:id/status', AppointmentsController.updateStatus);
 
 module.exports = router;

@@ -24,7 +24,20 @@ export default function Calendar() {
 
   useEffect(() => {
     if (selectedClinic) {
-      fetchAppointments();
+      const controller = new AbortController();
+      let mounted = true;
+      (async () => {
+        try {
+          await fetchAppointments({ signal: controller.signal, mountedRef: { mountedRef: () => mounted } });
+        } catch (e) {
+          /* ignore */
+        }
+      })();
+
+      return () => {
+        mounted = false;
+        controller.abort();
+      };
     }
   }, [selectedClinic]);
 
@@ -40,14 +53,32 @@ export default function Calendar() {
     }
   };
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = async ({ signal, mountedRef } = {}) => {
     try {
       const today = new Date();
-      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString();
-      const end = new Date(today.getFullYear(), today.getMonth() + 2, 0).toISOString();
+      // build UTC range: start at first day of previous month 00:00:00.000Z, end at last day of next month 23:59:59.999Z
+      const startDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1, 0, 0, 0, 0));
+      const endDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 2, 0, 23, 59, 59, 999));
+      const start = startDate.toISOString();
+      const end = endDate.toISOString();
 
-      const res = await api.get(`/appointments?clinic_id=${selectedClinic}&start_date=${start}&end_date=${end}`);
-      setAppointments(res.data.data);
+      const params = {
+        clinic_id: selectedClinic,
+        start_date: start,
+        end_date: end,
+        page: 1,
+        pageSize: 500,
+      };
+
+      const res = await api.get('/appointments', { params, signal });
+      const payload = res.data?.data;
+      if (payload && Array.isArray(payload.items)) {
+        if (!mountedRef || mountedRef.mountedRef()) setAppointments(payload.items || []);
+      } else if (Array.isArray(payload)) {
+        if (!mountedRef || mountedRef.mountedRef()) setAppointments(payload);
+      } else {
+        if (!mountedRef || mountedRef.mountedRef()) setAppointments([]);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -200,7 +231,6 @@ function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) 
       mountedRef.current = false;
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -211,7 +241,6 @@ function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) 
     if (clinicId) {
       api.get(`/clinics/${clinicId}/offices`).then(res => setOffices(res.data.data || [])).catch(console.error);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     setPendingOpPatient('initial');
   }, [clinicId]);
 
@@ -257,7 +286,6 @@ function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) 
         }
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.patient_id, patients]);
 
   const fetchPatients = async ({ resetPage = false, usePage = patientPage, usePageSize = patientPageSize, q = undefined, op = 'refresh' } = {}) => {
@@ -348,7 +376,6 @@ function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) 
     setFormData({ ...formData, patient_id: '' });
     setPatientsError('');
     setPendingOpPatient('initial');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.organization_id]);
 
   // debounce search
@@ -366,7 +393,6 @@ function CreateAppointmentModal({ selectedDate, clinicId, onClose, onSuccess }) 
     const op = pendingOpPatient || (initialPatientsLoading ? 'initial' : 'refresh');
     fetchPatients({ resetPage: false, usePage: patientPage, usePageSize: patientPageSize, op }).catch(() => {});
     setPendingOpPatient(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedPatientQuery, patientPage, patientPageSize, pendingOpPatient]);
 
   const handleSubmit = async (e) => {

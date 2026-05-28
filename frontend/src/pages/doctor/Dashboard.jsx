@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Users, Activity, Clock, ChevronRight } from 'lucide-react';
 import api from '../../lib/axios';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 export default function DoctorDashboard() {
   const [stats, setStats] = useState({
@@ -14,6 +15,7 @@ export default function DoctorDashboard() {
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [patientsError, setPatientsError] = useState('');
   const requestIdRef = useRef(0);
+  const { user } = useAuth();
 
   useEffect(() => {
     let abortController = null;
@@ -24,11 +26,18 @@ export default function DoctorDashboard() {
         const today = new Date().toISOString().split('T')[0];
 
         // Fetch appointments for today (primary)
-        const appointmentsRes = await api.get(`/appointments?start_date=${today}T00:00:00Z&end_date=${today}T23:59:59Z`, { signal: abortController.signal });
+        const start = `${today}T00:00:00.000Z`;
+        const end = `${today}T23:59:59.999Z`;
+
+        const params = { start_date: start, end_date: end, doctor_id: user?.id, page: 1, pageSize: 100 };
+        const appointmentsRes = await api.get('/appointments', { signal: abortController.signal, params });
         if (reqId !== requestIdRef.current) return;
 
-        setUpcomingAppointments(appointmentsRes.data.data.slice(0, 3));
-        setStats((s) => ({ ...s, todayAppointments: appointmentsRes.data.data.length }));
+        const payload = appointmentsRes.data?.data || [];
+        const allApps = Array.isArray(payload.items) ? payload.items : Array.isArray(payload) ? payload : [];
+
+        setUpcomingAppointments(allApps.slice(0, 3));
+        setStats((s) => ({ ...s, todayAppointments: allApps.length }));
 
         // Fetch patients count separately; non-blocking for dashboard render
         setPatientsError('');
@@ -106,7 +115,7 @@ export default function DoctorDashboard() {
           </div>
           <div>
             <p className="text-sm text-gray-500 font-medium">Estado</p>
-            <p className="text-2xl font-bold text-gray-900 text-green-600">Activo</p>
+            <p className="text-2xl font-bold text-green-600">Activo</p>
           </div>
         </div>
       </div>

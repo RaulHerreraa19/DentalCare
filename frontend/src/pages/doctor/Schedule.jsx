@@ -22,7 +22,20 @@ export default function DoctorSchedule() {
 
   useEffect(() => {
     if (selectedClinic) {
-      fetchAppointments();
+      const controller = new AbortController();
+      let mounted = true;
+      (async () => {
+        try {
+          await fetchAppointments({ signal: controller.signal, mountedRef: { mountedRef: () => mounted } });
+        } catch (e) {
+          /* ignore */
+        }
+      })();
+
+      return () => {
+        mounted = false;
+        controller.abort();
+      };
     }
   }, [selectedClinic]);
 
@@ -38,16 +51,31 @@ export default function DoctorSchedule() {
     }
   };
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = async ({ signal, mountedRef } = {}) => {
     try {
       setLoading(true);
       const today = new Date();
-      const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1).toISOString();
-      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString();
+      // UTC-aware range (yesterday to end of next month)
+      const startDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 1, 0, 0, 0, 0));
+      const endDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+      const start = startDate.toISOString();
+      const end = endDate.toISOString();
 
-      const res = await api.get(`/appointments?clinic_id=${selectedClinic}&start_date=${start}&end_date=${end}`);
-      let docsApps = res.data.data.filter(a => a.doctor.id === user.id);
-      setAppointments(docsApps);
+      const params = {
+        clinic_id: selectedClinic,
+        start_date: start,
+        end_date: end,
+        doctor_id: user?.id,
+        page: 1,
+        pageSize: 500,
+      };
+
+      const res = await api.get('/appointments', { params, signal });
+      const payload = res.data?.data;
+      const apps = payload && Array.isArray(payload.items) ? payload.items : Array.isArray(payload) ? payload : [];
+      // Server-side scoping by doctor_id is requested; we still defensively filter if needed
+      const docsApps = apps.filter(a => a.doctor?.id === user?.id);
+      if (!mountedRef || mountedRef.mountedRef()) setAppointments(docsApps);
     } catch (error) {
       console.error(error);
     } finally {
