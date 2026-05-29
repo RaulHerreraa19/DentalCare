@@ -252,7 +252,13 @@ class PatientsService {
   static async getDoctorPatients(organizationId, doctorId) {
     const [records, appointments] = await Promise.all([
       db.medicalRecord.findMany({
-        where: { organization_id: organizationId, doctor_id: doctorId },
+        // Some records may have a nullable organization_id (imports/migrations).
+        // Prefer matching by the patient.organization_id to avoid missing records
+        // that belong to the same tenant but have record.organization_id unset.
+        where: {
+          doctor_id: doctorId,
+          patient: { organization_id: organizationId },
+        },
         include: {
           patient: {
             select: {
@@ -345,10 +351,16 @@ class PatientsService {
     }
 
     return Array.from(patientMap.values()).sort((a, b) => {
-      const aTime = a.last_appointment_at ? new Date(a.last_appointment_at).getTime() : 0;
-      const bTime = b.last_appointment_at ? new Date(b.last_appointment_at).getTime() : 0;
+      const aTime = a.last_appointment_at
+        ? new Date(a.last_appointment_at).getTime()
+        : 0;
+      const bTime = b.last_appointment_at
+        ? new Date(b.last_appointment_at).getTime()
+        : 0;
       if (bTime !== aTime) return bTime - aTime;
-      return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+      return `${a.first_name} ${a.last_name}`.localeCompare(
+        `${b.first_name} ${b.last_name}`,
+      );
     });
   }
 

@@ -344,7 +344,6 @@ export default function ProfileSettings() {
                 </p>
              </div>
            )}
-
         </div>
       </div>
       </div>
