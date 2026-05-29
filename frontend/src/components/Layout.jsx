@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, LogOut, Building, Users, CalendarDays, UserSquare2, DollarSign, Activity, FileText, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, LogOut, Building, Users, CalendarDays, UserSquare2, DollarSign, Activity, FileText, MessageCircle, FileBarChart2 } from 'lucide-react';
 
 export const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user } = useAuth();
@@ -22,12 +22,14 @@ export const Layout = () => {
     SUPER_ADMIN: [
       { name: 'Dashboard Corporativo', path: '/superadmin/dashboard', icon: LayoutDashboard },
       { name: 'Entidades', path: '/superadmin/organizations', icon: Building },
+      { name: 'Reportes', path: '/reports', icon: FileBarChart2 },
     ],
     OWNER: [
       { name: 'Dashboard', path: '/owner/dashboard', icon: LayoutDashboard },
       { name: 'Sucursales', path: '/owner/clinics', icon: Building },
       { name: 'Equipo Directivo', path: '/owner/team', icon: Users },
       { name: 'Gestión de Caja', path: '/billing/cash', icon: DollarSign },
+      { name: 'Reportes', path: '/reports', icon: FileBarChart2 },
       { name: 'WhatsApp Meta', path: '/owner/whatsapp', icon: MessageCircle },
       { name: 'Utilerías de Identidad', path: '/doctor/profile', icon: UserSquare2 },
     ],
@@ -37,24 +39,26 @@ export const Layout = () => {
       { name: 'Expedientes Médicos', path: '/doctor/records', icon: FileText },
       { name: 'Agenda Médica', path: '/doctor/schedule', icon: CalendarDays },
       { name: 'Servicios Profesionales', path: '/doctor/services', icon: Activity },
+      { name: 'Reportes', path: '/reports', icon: FileBarChart2 },
       { name: 'Utilerías de Identidad', path: '/doctor/profile', icon: UserSquare2 },
     ],
     RECEPTIONIST: [
       { name: 'Calendario Operativo', path: '/reception/calendar', icon: CalendarDays },
       { name: 'Registro de Pacientes', path: '/reception/patients', icon: UserSquare2 },
       { name: 'Movimientos de Caja', path: '/billing/cash', icon: DollarSign },
+      { name: 'Reportes', path: '/reports', icon: FileBarChart2 },
     ]
   };
 
   const getMenuOptions = () => menuOptions[user?.role] || [];
 
   return (
-    <div className="flex h-screen bg-canvas font-sans antialiased text-ink">
+    <div className="flex h-screen bg-[#f7fafc] font-sans antialiased text-ink">
       {/* Sidebar Corporativo */}
-      <aside className="w-72 bg-slate-900 flex flex-col shadow-2xl z-20">
-        <div className="h-20 flex items-center px-8 border-b border-slate-800">
-          <Activity className="h-6 w-6 text-slate-100 mr-3" />
-          <span className="font-bold text-lg tracking-tight text-white uppercase">DentalCare <span className="text-[10px] text-slate-500 block -mt-1 font-medium tracking-widest">Enterprise</span></span>
+      <aside className="w-72 bg-white flex flex-col shadow-[0_24px_60px_-24px_rgba(15,23,42,0.22)] z-20 border-r border-slate-200/80">
+        <div className="h-20 flex items-center px-8 border-b border-slate-200">
+          <Activity className="h-6 w-6 text-slate-700 mr-3" />
+          <span className="text-lg tracking-tight text-slate-900 uppercase font-medium">DentalCare <span className="text-[10px] text-slate-500 block -mt-1 font-normal tracking-[0.22em]">Enterprise</span></span>
         </div>
         
         <nav className="flex-1 px-4 py-8 space-y-1">
@@ -65,32 +69,32 @@ export const Layout = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center px-4 py-3 rounded-md transition-all group ${
+                className={`flex items-center px-4 py-3 rounded-xl transition-all group ${
                   isActive 
-                    ? 'bg-slate-800 text-white shadow-lg' 
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                    ? 'bg-slate-100 text-slate-900 shadow-sm' 
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
-                <Icon className={`h-4 w-4 mr-3 transition-colors ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
-                <span className={`text-[13px] font-semibold tracking-wide ${isActive ? 'opacity-100' : 'opacity-80'}`}>{item.name}</span>
+                <Icon className={`h-4 w-4 mr-3 transition-colors ${isActive ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-700'}`} />
+                <span className={`text-[13px] font-normal tracking-wide ${isActive ? 'opacity-100' : 'opacity-90'}`}>{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-6 bg-slate-950 border-t border-slate-800">
+        <div className="p-6 bg-slate-50 border-t border-slate-200">
           <div className="flex items-center px-2 mb-6">
-            <div className="w-10 h-10 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-200 font-bold mr-3 shadow-inner">
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-700 font-semibold mr-3 shadow-sm">
               {user?.first_name?.[0]}
             </div>
             <div className="truncate">
-              <p className="text-sm font-bold text-white truncate">{user?.first_name} {user?.last_name}</p>
-              <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-0.5">{user?.role?.replace('_', ' ')}</p>
+              <p className="text-sm font-medium text-slate-900 truncate">{user?.first_name} {user?.last_name}</p>
+              <p className="text-[10px] text-slate-500 uppercase font-normal tracking-[0.22em] mt-0.5">{user?.role?.replace('_', ' ')}</p>
             </div>
           </div>
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center px-4 py-2.5 text-[11px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-md transition-all border border-transparent hover:border-rose-500/20 uppercase tracking-widest"
+            className="w-full flex items-center px-4 py-2.5 text-[11px] font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-all border border-slate-200 uppercase tracking-[0.2em]"
           >
             <LogOut className="h-3.5 w-3.5 mr-3" />
             Cerrar Sesión Activa
