@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../lib/axios';
 import Swal from 'sweetalert2';
+import SignatureCanvas from 'react-signature-canvas';
 import OdontogramVisualizer, { normalizeOdontogramRecords } from '../../components/odontogram/OdontogramVisualizer';
 import { LoadingScreen } from '../../components/ui';
 import {
@@ -486,6 +487,8 @@ export default function MedicalRecordEditor() {
   const [prescriptionsHistory, setPrescriptionsHistory] = useState([]);
   const [consentDrafts, setConsentDrafts] = useState(EMPTY_CONSENTS);
   const [baselineConsents, setBaselineConsents] = useState(EMPTY_CONSENTS);
+  const [patientSignatureUrl, setPatientSignatureUrl] = useState('');
+  const [savingPatientSignature, setSavingPatientSignature] = useState(false);
   const [form, setForm] = useState(cloneEmptyRecord());
   const [fullView, setFullView] = useState(!Boolean(appointmentId)); // compact when opened from a scheduled appointment
   const [activeStep, setActiveStep] = useState('history');
@@ -494,6 +497,7 @@ export default function MedicalRecordEditor() {
   const [prescInstructions, setPrescInstructions] = useState('');
   const [sessionNote, setSessionNote] = useState('');
   const [sessionPrice, setSessionPrice] = useState('500');
+  const patientSignatureRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -522,6 +526,7 @@ export default function MedicalRecordEditor() {
 
       setPatient(patientRes.data.data);
       setForm(hydrateRecord(recordRes.data.data));
+      setPatientSignatureUrl(recordRes.data.data?.patient_signature_url || '');
       setRecordMeta({
         latestVersion: recordRes.data.data?.latest_version || null,
         status: recordRes.data.data?.status || 'DRAFT'
@@ -560,6 +565,46 @@ export default function MedicalRecordEditor() {
         accepted,
       }
     }));
+  };
+
+  const handleSavePatientSignature = async () => {
+    try {
+      if (!patientSignatureRef.current || patientSignatureRef.current.isEmpty()) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Firma vacía',
+          text: 'Dibuja la firma del paciente antes de guardarla.',
+          confirmButtonColor: '#0f172a'
+        });
+        return;
+      }
+
+      setSavingPatientSignature(true);
+      const base64 = patientSignatureRef.current.toDataURL('image/png');
+      const { data } = await api.post(`/medical-records/${patientId}/signature`, {
+        base64,
+        original_name: 'patient-signature.png',
+      });
+
+      setPatientSignatureUrl(data.data?.patient_signature_url || '');
+      patientSignatureRef.current.clear();
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Firma guardada',
+        text: 'La firma del paciente quedó ligada al expediente y subida a Cloudflare R2.',
+        confirmButtonColor: '#0f172a'
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: 'error',
+        title: 'No se pudo guardar la firma',
+        text: error.response?.data?.message || 'Intenta de nuevo.',
+        confirmButtonColor: '#0f172a'
+      });
+    } finally {
+      setSavingPatientSignature(false);
+    }
   };
 
   const addProcedure = () => {
@@ -936,6 +981,7 @@ export default function MedicalRecordEditor() {
                     { key: 'diagnosisPlan', label: 'Diagnóstico & Plan' },
                     { key: 'odontogram', label: 'Odontograma' },
                     { key: 'consents', label: 'Consentimientos' },
+                    { key: 'followup', label: 'Seguimiento' },
                     { key: 'summary', label: 'Resumen' },
                   ].map((step, idx) => (
                     <button
@@ -1101,7 +1147,146 @@ export default function MedicalRecordEditor() {
                         <ConsentCard key={type} type={type} draft={consentDrafts[type]} onToggle={handleConsentToggle} />
                       ))}
                     </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-[1.3fr_0.9fr] gap-5 pt-2">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 space-y-4">
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Firma del paciente</div>
+                          <p className="text-xs text-slate-500 mt-1">La firma queda ligada al expediente y se almacena en Cloudflare R2.</p>
+                        </div>
+
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-3 shadow-inner">
+                          <SignatureCanvas
+                            ref={patientSignatureRef}
+                            penColor="#0f172a"
+                            canvasProps={{
+                              style: { width: '100%', height: '180px' },
+                              className: 'rounded-xl bg-white'
+                            }}
+                          />
+                        </div>
+
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            onClick={() => patientSignatureRef.current?.clear()}
+                            className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-[10px] font-black uppercase tracking-[0.22em] text-slate-600 hover:text-slate-900"
+                          >
+                            Limpiar firma
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSavePatientSignature}
+                            disabled={savingPatientSignature}
+                            className="px-4 py-3 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.22em] disabled:opacity-70"
+                          >
+                            {savingPatientSignature ? 'Guardando...' : 'Guardar firma'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+                        <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Firma ligada al expediente</div>
+                        <div className="min-h-[180px] rounded-2xl border border-slate-200 bg-slate-50/70 flex items-center justify-center overflow-hidden">
+                          {patientSignatureUrl ? (
+                            <img src={patientSignatureUrl} alt="Firma del paciente" className="max-h-[160px] max-w-full object-contain p-4" />
+                          ) : (
+                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-300 text-center px-6">Aún no hay una firma guardada para este expediente.</p>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-6">
+                          Guarda aquí la firma autógrafa del paciente para asociarla al expediente clínico y mantener su evidencia en almacenamiento seguro.
+                        </p>
+                      </div>
+                    </div>
                   </SectionCard>
+                )}
+
+                {activeStep === 'followup' && (
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <SectionCard title="Alertas médicas y alergias" icon={AlertCircle} accent="rose" subtitle="Usa este espacio para riesgo clínico inmediato.">
+                      <textarea
+                        name="allergies"
+                        className="w-full bg-white border border-rose-200 rounded-xl p-4 text-sm font-medium text-rose-900 focus:ring-2 focus:ring-rose-500 outline-none min-h-[140px] shadow-inner"
+                        placeholder="Registrar alergias relevantes..."
+                        value={form.allergies}
+                        onChange={handleChange}
+                      />
+                    </SectionCard>
+
+                    <SectionCard title="Medicación vigente" icon={ShieldCheck} accent="slate" subtitle="Tratamientos farmacológicos activos y observaciones.">
+                      <textarea
+                        name="current_medications"
+                        className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-slate-900 min-h-[140px]"
+                        placeholder="Tratamientos farmacológicos activos..."
+                        value={form.current_medications}
+                        onChange={handleChange}
+                      />
+                    </SectionCard>
+
+                    <SectionCard title="Recetas emitidas" icon={Clipboard} accent="slate" subtitle="Recetario digital e historial para impresión rápida.">
+                      <div className="space-y-4 max-h-[260px] overflow-y-auto custom-scrollbar">
+                        {prescriptionsHistory.length > 0 ? prescriptionsHistory.map((prescription) => (
+                          <div key={prescription.id} className="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 flex justify-between items-center group">
+                            <div>
+                              <p className="text-[9px] font-black text-slate-400 uppercase">{new Date(prescription.created_at).toLocaleDateString('es-MX')}</p>
+                              <p className="text-xs font-medium mt-1 text-slate-100">{prescription.medications.length} fórmulas</p>
+                            </div>
+                            <button onClick={() => handlePrint(prescription)} className="p-3 bg-slate-700 hover:bg-white hover:text-slate-950 rounded-lg transition-all">
+                              <Printer className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )) : (
+                          <p className="text-center py-6 text-xs text-slate-400 font-medium uppercase tracking-widest italic opacity-70">Sin registros</p>
+                        )}
+                      </div>
+                    </SectionCard>
+
+                    <SectionCard title="Versiones del expediente" icon={Clock} accent="slate" subtitle="Historial de cambios del expediente clínico.">
+                      <div className="space-y-4 max-h-[260px] overflow-y-auto">
+                        {recordHistory.versions?.length > 0 ? recordHistory.versions.map((version) => (
+                          <div key={version.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Versión {version.version_number}</p>
+                              <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">{version.is_locked ? 'Bloqueada' : 'Borrador'}</span>
+                            </div>
+                            <p className="text-xs font-medium text-slate-700 mt-2 line-clamp-2">{version.change_reason || 'Sin motivo registrado'}</p>
+                          </div>
+                        )) : (
+                          <p className="text-center py-6 text-[10px] font-black text-slate-300 uppercase">Sin versiones</p>
+                        )}
+                      </div>
+                    </SectionCard>
+
+                    <SectionCard title="Evolución clínica" icon={Clock} accent="slate" subtitle="Notas y visitas recientes del paciente.">
+                      <div className="space-y-6 max-h-[260px] overflow-y-auto">
+                        {recordHistory.note_versions?.length > 0 ? recordHistory.note_versions.map((note) => (
+                          <div key={note.id} className="relative pl-6 border-l-2 border-slate-200 pb-2">
+                            <span className="absolute -left-[5px] top-1 w-2 h-2 bg-slate-200 rounded-full" />
+                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">{new Date(note.created_at).toLocaleDateString('es-MX', { dateStyle: 'short' })}</p>
+                            <p className="text-xs text-slate-600 font-medium line-clamp-3 hover:line-clamp-none cursor-pointer transition-all">{note.content}</p>
+                          </div>
+                        )) : (
+                          <p className="text-center py-6 text-[10px] font-black text-slate-300 uppercase">Sin visitas registradas</p>
+                        )}
+                      </div>
+                    </SectionCard>
+
+                    <SectionCard title="Consentimientos" icon={ShieldCheck} accent="slate" subtitle="Estado general de aceptación de consentimientos.">
+                      <div className="space-y-4 max-h-[260px] overflow-y-auto">
+                        {Object.keys(CONSENT_LIBRARY).map((type) => (
+                          <div key={type} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{CONSENT_LIBRARY[type].title}</p>
+                              <span className={`text-[9px] font-black uppercase tracking-[0.18em] ${consentDrafts[type].accepted ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                {consentDrafts[type].accepted ? 'Activo' : 'Pendiente'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </SectionCard>
+                  </div>
                 )}
 
                 {activeStep === 'summary' && (
@@ -1118,124 +1303,17 @@ export default function MedicalRecordEditor() {
           )}
         </div>
 
-        <div className="lg:col-span-4 space-y-8 sticky top-8">
-          <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center text-rose-800 mb-4">
-              <AlertCircle className="w-5 h-5 mr-3" />
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Alertas médicas y alergias</h3>
-            </div>
-            <textarea
-              name="allergies"
-              className="w-full bg-white border border-rose-200 rounded-xl p-4 text-sm font-black text-rose-900 focus:ring-2 focus:ring-rose-500 outline-none min-h-[100px] shadow-inner"
-              placeholder="Registrar alergias relevantes..."
-              value={form.allergies}
-              onChange={handleChange}
-            />
+        <div className="lg:col-span-12">
+          <div className="flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="mt-2 bg-slate-900 text-white px-6 py-4 rounded-2xl flex items-center justify-center space-x-3 hover:bg-black transition-all shadow-2xl font-medium text-sm uppercase tracking-[0.22em] disabled:opacity-70"
+            >
+              <Save className="w-5 h-5" />
+              <span>{saving ? 'Sincronizando...' : (appointmentId ? 'Guardar y finalizar' : 'Guardar cambios')}</span>
+            </button>
           </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center text-slate-900 mb-4">
-              <ShieldCheck className="w-5 h-5 mr-3" />
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Medicación vigente</h3>
-            </div>
-            <textarea
-              name="current_medications"
-              className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-900 min-h-[100px]"
-              placeholder="Tratamientos farmacológicos activos..."
-              value={form.current_medications}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="bg-slate-900 text-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="bg-slate-950 px-6 py-4 flex items-center justify-between">
-              <h3 className="text-[9px] font-black uppercase tracking-[0.2em] flex items-center"><Clipboard className="w-4 h-4 mr-2" /> Recetas emitidas</h3>
-              <button onClick={() => setShowPrescriptionModal(true)} className="p-1 px-3 text-emerald-400 font-black hover:bg-slate-800 transition-all text-[10px] flex items-center">
-                <Plus className="w-3 h-3 mr-1" /> Nueva
-              </button>
-            </div>
-            <div className="p-6 space-y-4 max-h-[260px] overflow-y-auto custom-scrollbar">
-              {prescriptionsHistory.length > 0 ? prescriptionsHistory.map((prescription) => (
-                <div key={prescription.id} className="bg-slate-800/50 p-4 rounded-xl border border-slate-800 flex justify-between items-center group">
-                  <div>
-                    <p className="text-[9px] font-black text-slate-500 uppercase">{new Date(prescription.created_at).toLocaleDateString('es-MX')}</p>
-                    <p className="text-xs font-bold mt-1 text-slate-100">{prescription.medications.length} fórmulas</p>
-                  </div>
-                  <button onClick={() => handlePrint(prescription)} className="p-3 bg-slate-700 hover:bg-white hover:text-slate-950 rounded-lg transition-all">
-                    <Printer className="w-4 h-4" />
-                  </button>
-                </div>
-              )) : (
-                <p className="text-center py-6 text-xs text-slate-600 font-black uppercase tracking-widest italic opacity-50">Sin registros</p>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="bg-slate-50 px-6 py-4 flex items-center text-slate-900 border-b border-slate-200">
-              <Clock className="w-4 h-4 mr-2" />
-              <h3 className="text-[9px] font-black uppercase tracking-[0.2em]">Versiones del expediente</h3>
-            </div>
-            <div className="p-6 space-y-4 max-h-[260px] overflow-y-auto">
-              {recordHistory.versions?.length > 0 ? recordHistory.versions.map((version) => (
-                <div key={version.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Versión {version.version_number}</p>
-                    <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">{version.is_locked ? 'Bloqueada' : 'Borrador'}</span>
-                  </div>
-                  <p className="text-xs font-bold text-slate-700 mt-2 line-clamp-2">{version.change_reason || 'Sin motivo registrado'}</p>
-                </div>
-              )) : (
-                <p className="text-center py-6 text-[10px] font-black text-slate-300 uppercase">Sin versiones</p>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="bg-slate-50 px-6 py-4 flex items-center text-slate-900 border-b border-slate-200">
-              <Clock className="w-4 h-4 mr-2" />
-              <h3 className="text-[9px] font-black uppercase tracking-[0.2em]">Evolución clínica</h3>
-            </div>
-            <div className="p-6 space-y-6 max-h-[260px] overflow-y-auto">
-              {recordHistory.note_versions?.length > 0 ? recordHistory.note_versions.map((note) => (
-                <div key={note.id} className="relative pl-6 border-l-2 border-slate-200 pb-2">
-                  <span className="absolute -left-[5px] top-1 w-2 h-2 bg-slate-200 rounded-full" />
-                  <p className="text-[9px] font-black text-slate-400 uppercase mb-1">{new Date(note.created_at).toLocaleDateString('es-MX', { dateStyle: 'short' })}</p>
-                  <p className="text-xs text-slate-600 font-bold line-clamp-3 hover:line-clamp-none cursor-pointer transition-all">{note.content}</p>
-                </div>
-              )) : (
-                <p className="text-center py-6 text-[10px] font-black text-slate-300 uppercase">Sin visitas registradas</p>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="bg-slate-50 px-6 py-4 flex items-center text-slate-900 border-b border-slate-200">
-              <ShieldCheck className="w-4 h-4 mr-2" />
-              <h3 className="text-[9px] font-black uppercase tracking-[0.2em]">Consentimientos</h3>
-            </div>
-            <div className="p-6 space-y-4 max-h-[260px] overflow-y-auto">
-              {Object.keys(CONSENT_LIBRARY).map((type) => (
-                <div key={type} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{CONSENT_LIBRARY[type].title}</p>
-                    <span className={`text-[9px] font-black uppercase tracking-[0.18em] ${consentDrafts[type].accepted ? 'text-emerald-600' : 'text-slate-400'}`}>
-                      {consentDrafts[type].accepted ? 'Activo' : 'Pendiente'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full bg-slate-900 text-white p-6 rounded-2xl flex items-center justify-center space-x-3 hover:bg-black transition-all shadow-2xl font-black text-sm uppercase tracking-[0.3em] disabled:opacity-70"
-          >
-            <Save className="w-6 h-6" />
-            <span>{saving ? 'Sincronizando...' : (appointmentId ? 'Guardar y finalizar' : 'Guardar cambios')}</span>
-          </button>
         </div>
       </div>
 

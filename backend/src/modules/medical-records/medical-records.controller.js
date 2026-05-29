@@ -105,6 +105,25 @@ const addNote = async (req, res) => {
   }
 };
 
+const savePatientSignature = async (req, res) => {
+  try {
+    const record = await MedicalRecordsService.savePatientSignature(
+      req.user.id,
+      req.params.patientId,
+      req.body,
+      req.ip,
+      req.headers["user-agent"],
+    );
+    return ApiResponse.success(
+      res,
+      "Firma del paciente guardada correctamente.",
+      record,
+    );
+  } catch (error) {
+    return ApiResponse.error(res, error.message, error.statusCode || 500);
+  }
+};
+
 const upsertConsent = async (req, res) => {
   try {
     const consent = await MedicalRecordsService.upsertConsent(
@@ -148,6 +167,7 @@ module.exports = {
   updateRecord,
   signNote,
   addNote,
+  savePatientSignature,
   upsertConsent,
   listConsents,
 };

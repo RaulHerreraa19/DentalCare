@@ -348,6 +348,9 @@ model MedicalRecord {
   locked_at         DateTime?
   signed_at         DateTime?
   signature_hash    String?
+  patient_signature_url   String?
+  patient_signature_at    DateTime?
+  patient_signature_hash  String?
   
   diagnosis               String?
   treatment_plan          String?

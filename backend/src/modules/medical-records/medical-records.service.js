@@ -3,6 +3,7 @@ const db = require("../../config/database");
 const AppError = require("../../utils/AppError");
 const { generateDigitalSeal } = require("../../utils/crypto");
 const AuditLogService = require("../audit/audit.service");
+const StorageService = require("../../services/storage.service");
 
 const DEFAULT_TOOTH_DATA = [];
 
@@ -52,6 +53,15 @@ const normalizeToothData = (value) => {
   }
 
   return DEFAULT_TOOTH_DATA;
+};
+
+const extractBase64ImageBuffer = (value) => {
+  const base64Data = String(value || "").replace(/^data:image\/\w+;base64,/, "");
+  if (!base64Data) {
+    return null;
+  }
+
+  return Buffer.from(base64Data, "base64");
 };
 
 const attachLatestOdontogram = async (record) => {
@@ -485,6 +495,69 @@ class MedicalRecordsService {
     });
 
     return note;
+  }
+
+  static async savePatientSignature(doctorId, patientId, data, ipAddress, userAgent) {
+    const patient = await db.patient.findUnique({ where: { id: patientId } });
+    if (!patient) throw new AppError("Paciente no encontrado", 404);
+
+    const buffer = extractBase64ImageBuffer(data.base64);
+
+    if (!buffer || buffer.length === 0) {
+      throw new AppError("La firma del paciente es obligatoria.", 400);
+    }
+
+    const record = await this.getOrCreateRecord(doctorId, patientId);
+
+    const signatureUrl = await StorageService.uploadImage(
+      buffer,
+      data.original_name || "patient-signature.png",
+      "patient-signatures",
+    );
+
+    const patientSignatureAt = new Date();
+    const signatureHash = crypto
+      .createHash("sha256")
+      .update([
+        record.id,
+        patientId,
+        signatureUrl,
+        patientSignatureAt.toISOString(),
+        process.env.SIGNATURE_SALT || "dental-care-salt-2026",
+      ].join("|"))
+      .digest("hex");
+
+    const updatedRecord = await db.medicalRecord.update({
+      where: { id: record.id },
+      data: {
+        patient_signature_url: signatureUrl,
+        patient_signature_at: patientSignatureAt,
+        patient_signature_hash: signatureHash,
+      },
+    });
+
+    await AuditLogService.log({
+      userId: doctorId,
+      action: "UPDATE",
+      targetModel: "MEDICAL_RECORD",
+      targetId: updatedRecord.id,
+      organizationId: updatedRecord.organization_id,
+      patientId,
+      resourceType: "medical_record_signature",
+      resourceId: updatedRecord.id,
+      accessGranted: true,
+      ipAddress,
+      userAgent,
+      afterSnapshot: {
+        patient_signature_url: signatureUrl,
+        patient_signature_at: patientSignatureAt,
+      },
+      metadata: {
+        signature_hash: signatureHash,
+      },
+    });
+
+    return updatedRecord;
   }
 
   static async upsertConsent(doctorId, patientId, data, ipAddress, userAgent) {
