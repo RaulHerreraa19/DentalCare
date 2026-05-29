@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Users, Activity, Clock, ChevronRight } from 'lucide-react';
+import { Calendar, Users, Activity, Clock, ChevronRight, FileText } from 'lucide-react';
 import api from '../../lib/axios';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -44,15 +44,10 @@ export default function DoctorDashboard() {
         setPatientsError('');
         setPatientsLoading(true);
         try {
-          const patientsRes = await api.get('/patients', { params: { mode: 'paginated', page: 1, pageSize: 1 }, signal: abortController.signal });
+          const patientsRes = await api.get('/patients/doctor', { signal: abortController.signal });
           if (reqId !== requestIdRef.current) return;
           const payload = patientsRes.data?.data;
-          let totalPatientsCount = 0;
-          if (payload && !Array.isArray(payload) && Array.isArray(payload.items)) {
-            totalPatientsCount = typeof payload.total === 'number' ? payload.total : payload.items.length;
-          } else if (Array.isArray(payload)) {
-            totalPatientsCount = payload.length;
-          }
+          const totalPatientsCount = Array.isArray(payload) ? payload.length : (payload?.total || 0);
           setStats((s) => ({ ...s, totalPatients: totalPatientsCount }));
         } catch (err) {
           if (err.name === 'AbortError') return;
@@ -162,6 +157,14 @@ export default function DoctorDashboard() {
             <p className="text-primary-100 mb-6">Gestiona tus servicios y agenda en un clic.</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
+            <Link to="/doctor/patients" className="bg-white/10 hover:bg-white/20 p-4 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
+              <Users className="h-6 w-6 mb-2" />
+              <p className="font-medium">Pacientes</p>
+            </Link>
+            <Link to="/doctor/records" className="bg-white/10 hover:bg-white/20 p-4 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
+              <FileText className="h-6 w-6 mb-2" />
+              <p className="font-medium">Expedientes</p>
+            </Link>
             <Link to="/doctor/schedule" className="bg-white/10 hover:bg-white/20 p-4 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
               <Calendar className="h-6 w-6 mb-2" />
               <p className="font-medium">Abrir Agenda</p>

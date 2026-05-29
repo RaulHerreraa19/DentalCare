@@ -15,6 +15,7 @@ import OwnerTeam from './pages/owner/Team';
 import WhatsAppSettings from './pages/owner/WhatsAppSettings';
 import DoctorServices from './pages/doctor/Services';
 import DoctorDashboard from './pages/doctor/Dashboard';
+import DoctorPatients from './pages/doctor/Patients';
 import CashRegister from './pages/reception/CashRegister';
 import MedicalRecordEditor from './pages/doctor/MedicalRecordEditor';
 import ProfileSettings from './pages/doctor/ProfileSettings';
@@ -110,10 +111,12 @@ function App() {
           <Route path="/owner/whatsapp" element={<ProtectedRoute allowedRoles={['OWNER']}><WhatsAppSettings /></ProtectedRoute>} />
           
           <Route path="/doctor/services" element={<ProtectedRoute allowedRoles={['DOCTOR']}><DoctorServices /></ProtectedRoute>} />
+          <Route path="/doctor/patients" element={<ProtectedRoute allowedRoles={['DOCTOR']}><DoctorPatients /></ProtectedRoute>} />
           <Route path="/doctor/schedule" element={<ProtectedRoute allowedRoles={['DOCTOR']}><DoctorSchedule /></ProtectedRoute>} />
           <Route path="/doctor/dashboard" element={<ProtectedRoute allowedRoles={['DOCTOR']}><DoctorDashboard /></ProtectedRoute>} />
           <Route path="/doctor/medical-records/:patientId" element={<ProtectedRoute allowedRoles={['DOCTOR']}><MedicalRecordEditor /></ProtectedRoute>} />
           <Route path="/doctor/expedient/:patientId" element={<ProtectedRoute allowedRoles={['DOCTOR']}><LegacyExpedientRedirect /></ProtectedRoute>} />
+          <Route path="/doctor/records" element={<ProtectedRoute allowedRoles={['DOCTOR']}><MedicalRecordsFollowup /></ProtectedRoute>} />
           <Route path="/doctor/followup" element={<ProtectedRoute allowedRoles={['DOCTOR']}><MedicalRecordsFollowup /></ProtectedRoute>} />
           <Route path="/doctor/profile" element={<ProtectedRoute allowedRoles={['DOCTOR', 'OWNER']}><ProfileSettings /></ProtectedRoute>} />
           

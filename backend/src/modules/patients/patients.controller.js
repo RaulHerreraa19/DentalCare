@@ -98,6 +98,22 @@ class PatientsController {
     }
   }
 
+  static async getDoctorPatients(req, res, next) {
+    try {
+      const patients = await PatientsService.getDoctorPatients(
+        req.user.organization_id,
+        req.user.id,
+      );
+      return ApiResponse.success(
+        res,
+        "Pacientes del doctor obtenidos correctamente",
+        patients,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async updatePatient(req, res, next) {
     try {
       const { id } = req.params;

@@ -33,9 +33,10 @@ export const Layout = () => {
     ],
     DOCTOR: [
       { name: 'Panel de Control', path: '/doctor/dashboard', icon: LayoutDashboard },
+      { name: 'Pacientes del Doctor', path: '/doctor/patients', icon: Users },
+      { name: 'Expedientes Médicos', path: '/doctor/records', icon: FileText },
       { name: 'Agenda Médica', path: '/doctor/schedule', icon: CalendarDays },
       { name: 'Servicios Profesionales', path: '/doctor/services', icon: Activity },
-      { name: 'Expedientes Clínicos', path: '/doctor/followup', icon: FileText },
       { name: 'Utilerías de Identidad', path: '/doctor/profile', icon: UserSquare2 },
     ],
     RECEPTIONIST: [

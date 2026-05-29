@@ -9,6 +9,7 @@ router.use(protect);
 
 router.post('/', PatientsController.createPatient);
 router.get('/', PatientsController.getPatients);
+router.get('/doctor', restrictTo('DOCTOR'), PatientsController.getDoctorPatients);
 router.get('/:id', PatientsController.getPatientById);
 router.put('/:id', PatientsController.updatePatient);
 

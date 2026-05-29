@@ -249,6 +249,109 @@ class PatientsService {
     };
   }
 
+  static async getDoctorPatients(organizationId, doctorId) {
+    const [records, appointments] = await Promise.all([
+      db.medicalRecord.findMany({
+        where: { organization_id: organizationId, doctor_id: doctorId },
+        include: {
+          patient: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              email: true,
+              phone: true,
+              date_of_birth: true,
+              gender: true,
+              address: true,
+              created_at: true,
+            },
+          },
+        },
+        orderBy: { updated_at: "desc" },
+      }),
+      db.appointment.findMany({
+        where: { organization_id: organizationId, doctor_id: doctorId },
+        include: {
+          patient: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              email: true,
+              phone: true,
+              date_of_birth: true,
+              gender: true,
+              address: true,
+              created_at: true,
+            },
+          },
+          clinic: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: [{ start_time: "desc" }, { id: "desc" }],
+      }),
+    ]);
+
+    const patientMap = new Map();
+
+    for (const record of records) {
+      if (!record.patient) continue;
+
+      patientMap.set(record.patient.id, {
+        ...record.patient,
+        has_record: true,
+        record_id: record.id,
+        record_status: record.status,
+        record_version: record.current_version,
+        record_updated_at: record.updated_at,
+        last_appointment_at: null,
+        last_appointment_clinic: null,
+        appointment_count: 0,
+      });
+    }
+
+    for (const appointment of appointments) {
+      if (!appointment.patient) continue;
+
+      const existing = patientMap.get(appointment.patient.id);
+      const appointmentInfo = {
+        patient_id: appointment.patient.id,
+        last_appointment_at: appointment.start_time,
+        last_appointment_clinic: appointment.clinic,
+        appointment_count: (existing?.appointment_count || 0) + 1,
+      };
+
+      if (!existing) {
+        patientMap.set(appointment.patient.id, {
+          ...appointment.patient,
+          has_record: false,
+          record_id: null,
+          record_status: null,
+          record_version: null,
+          record_updated_at: null,
+          ...appointmentInfo,
+        });
+      } else {
+        patientMap.set(appointment.patient.id, {
+          ...existing,
+          ...appointmentInfo,
+        });
+      }
+    }
+
+    return Array.from(patientMap.values()).sort((a, b) => {
+      const aTime = a.last_appointment_at ? new Date(a.last_appointment_at).getTime() : 0;
+      const bTime = b.last_appointment_at ? new Date(b.last_appointment_at).getTime() : 0;
+      if (bTime !== aTime) return bTime - aTime;
+      return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+    });
+  }
+
   static async getPatientById(organizationId, patientId) {
     const patient = await db.patient.findFirst({
       where: { id: patientId, organization_id: organizationId },
