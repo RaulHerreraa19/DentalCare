@@ -1293,8 +1293,8 @@ export default function MedicalRecordEditor() {
                   <SectionCard title="Resumen clínico" icon={Clipboard} accent="slate" subtitle="Resumen estructurado para lectura rápida y continuidad clínica.">
                     <Field label="Resumen clínico del expediente" name="note_summary" value={form.note_summary} onChange={handleChange} textarea rows={6} helpText="Este texto se usa como sinopsis del expediente clínico." />
                     <div className="flex gap-4 pt-4">
-                      <button onClick={() => setActiveStep('diagnosisPlan')} className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">Volver</button>
-                      <button onClick={handleSave} disabled={saving} className="px-4 py-3 bg-slate-900 text-white rounded-xl">{saving ? 'Sincronizando...' : 'Guardar expediente'}</button>
+                      {/* <button onClick={() => setActiveStep('diagnosisPlan')} className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">Volver</button>
+                      <button onClick={handleSave} disabled={saving} className="px-4 py-3 bg-slate-900 text-white rounded-xl">{saving ? 'Sincronizando...' : 'Guardar expediente'}</button> */}
                     </div>
                   </SectionCard>
                 )}
