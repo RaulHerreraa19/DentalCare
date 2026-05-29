@@ -1,6 +1,7 @@
 const express = require("express");
 const PatientsController = require("./patients.controller");
-const { protect, restrictTo } = require("../../middlewares/auth.middleware");
+const { protect } = require("../../middlewares/auth.middleware");
+const { restrictTo } = require("../../middlewares/rbac.middleware");
 
 const router = express.Router();
 
