@@ -487,6 +487,8 @@ export default function MedicalRecordEditor() {
   const [consentDrafts, setConsentDrafts] = useState(EMPTY_CONSENTS);
   const [baselineConsents, setBaselineConsents] = useState(EMPTY_CONSENTS);
   const [form, setForm] = useState(cloneEmptyRecord());
+  const [fullView, setFullView] = useState(!Boolean(appointmentId)); // compact when opened from a scheduled appointment
+  const [activeStep, setActiveStep] = useState('history');
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [medications, setMedications] = useState([{ name: '', dose: '', frequency: '', duration: '' }]);
   const [prescInstructions, setPrescInstructions] = useState('');
@@ -896,16 +898,16 @@ export default function MedicalRecordEditor() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <div className="lg:col-span-8 space-y-8">
-          {appointmentId && (
-            <SectionCard title="Nota de evolución actual" icon={Stethoscope} accent="emerald" subtitle="Se adjunta junto con la consulta y la cita activa.">
+          {!fullView && appointmentId ? (
+            <SectionCard title="Nota de evolución (consulta)" icon={Stethoscope} accent="emerald" subtitle="Registra únicamente la nota clínica de la cita y enlázala al expediente completo si lo necesitas.">
               <div className="space-y-4">
                 <textarea
-                  className="w-full border-2 border-slate-100 rounded-xl p-5 text-sm outline-none focus:border-slate-900 min-h-[170px] font-medium transition-all shadow-inner bg-slate-50/50"
+                  className="w-full border-2 border-slate-100 rounded-xl p-5 text-sm outline-none focus:border-slate-900 min-h-[220px] font-medium transition-all shadow-inner bg-slate-50/50"
                   placeholder="Describe hallazgos, procedimientos realizados, evolución y recomendaciones del día..."
                   value={sessionNote}
                   onChange={(e) => setSessionNote(e.target.value)}
                 />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
                   <Field
                     label="Honorarios de sesión"
                     name="sessionPrice"
@@ -914,171 +916,206 @@ export default function MedicalRecordEditor() {
                     type="number"
                     placeholder="500"
                     helpText="Se sincroniza con la cita cuando guardes la consulta."
+                    className="max-w-xs"
                   />
-                  <div className="flex items-center text-[11px] text-slate-500 italic leading-relaxed pt-6">
-                    Esta nota se convierte en la evolución clínica de la consulta activa.
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button onClick={() => setFullView(true)} className="px-4 py-3 bg-slate-900 text-white rounded-xl font-black uppercase text-[11px]">Ir al expediente</button>
+                    <button onClick={handleSave} className="px-4 py-3 bg-emerald-600 text-white rounded-xl font-black uppercase text-[11px]">Guardar nota</button>
                   </div>
                 </div>
               </div>
             </SectionCard>
-          )}
-
-          <SectionCard title="Ficha de identificación" icon={Building2} subtitle="Los datos del paciente son de lectura solamente en esta pantalla.">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm text-slate-700">
-              <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Nombre completo</div>
-                <div className="font-bold">{patient?.first_name} {patient?.last_name}</div>
-              </div>
-              <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Contacto</div>
-                <div className="font-bold">{patient?.phone || 'No registrado'}</div>
-              </div>
-              <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Correo</div>
-                <div className="font-bold">{patient?.email || 'No registrado'}</div>
-              </div>
-              <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Contacto de emergencia</div>
-                <div className="font-bold">{patient?.emergency_contact || 'No registrado'}</div>
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Historia clínica" icon={Clipboard} accent="slate" subtitle="Antecedentes heredofamiliares, patológicos, no patológicos y odontológicos.">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Field label="Heredofamiliares" name="family_history" value={form.family_history} onChange={handleChange} textarea rows={4} />
-              <Field label="Patológicos" name="pathological_history" value={form.pathological_history} onChange={handleChange} textarea rows={4} />
-              <Field label="No patológicos" name="non_pathological_history" value={form.non_pathological_history} onChange={handleChange} textarea rows={4} />
-              <Field label="Quirúrgicos / hospitalarios" name="surgeries" value={form.surgeries} onChange={handleChange} textarea rows={4} />
-              <Field label="Alergias" name="allergies" value={form.allergies} onChange={handleChange} textarea rows={4} required helpText="Campo de alto riesgo clínico." />
-              <Field label="Medicación actual" name="current_medications" value={form.current_medications} onChange={handleChange} textarea rows={4} />
-              <Field label="Historia dental" name="dental_history" value={form.dental_history} onChange={handleChange} textarea rows={4} />
-              <Field label="Frecuencia de cepillado" name="brushing_frequency" value={form.brushing_frequency} onChange={handleChange} placeholder="Ej. 3 veces al día" />
-            </div>
-            <label className="flex items-center gap-3 text-sm font-bold text-slate-700 pt-2">
-              <input type="checkbox" name="use_floss" checked={form.use_floss} onChange={handleChange} className="w-5 h-5 accent-slate-900" />
-              Utiliza hilo dental
-            </label>
-          </SectionCard>
-
-          <SectionCard title="Interrogatorio" icon={FileText} accent="amber" subtitle="Motivo de consulta, dolor y síntomas relevantes.">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Field label="Motivo de consulta" name="chief_complaint" value={form.chief_complaint} onChange={handleChange} textarea rows={4} required />
-              <Field label="Fecha de inicio de síntomas" name="symptoms_start_date" value={form.symptoms_start_date} onChange={handleChange} type="date" />
-              <Field label="Presencia de dolor" name="pain_presence" value={form.pain_presence} onChange={handleChange} type="checkbox" placeholder="Registrar presencia de dolor" />
-              <Field label="Intensidad del dolor (0-10)" name="pain_intensity" value={form.pain_intensity} onChange={handleChange} type="number" />
-              <Field label="Carácter del dolor" name="pain_character" value={form.pain_character} onChange={handleChange} placeholder="Ej. punzante, sordo, pulsátil" />
-              <Field label="Localización" name="pain_location" value={form.pain_location} onChange={handleChange} placeholder="Ej. molar inferior derecho" />
-              <Field label="Factores desencadenantes" name="pain_triggers" value={form.pain_triggers} onChange={handleChange} textarea rows={3} />
-              <Field label="Alivio" name="pain_relief" value={form.pain_relief} onChange={handleChange} textarea rows={3} />
-            </div>
-            <Field label="Revisión por sistemas" name="review_of_systems" value={form.review_of_systems} onChange={handleChange} textarea rows={4} />
-          </SectionCard>
-
-          <SectionCard title="Exploración clínica" icon={Brush} accent="slate" subtitle="Hallazgos extraorales, intraorales, periodontales y radiográficos.">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Field label="Exploración extraoral" name="extraoral_exam" value={form.extraoral_exam} onChange={handleChange} textarea rows={4} />
-              <Field label="Exploración intraoral" name="intraoral_exam" value={form.intraoral_exam} onChange={handleChange} textarea rows={4} />
-              <Field label="Estado periodontal" name="periodontal_status" value={form.periodontal_status} onChange={handleChange} textarea rows={4} />
-              <Field label="Hallazgos radiográficos" name="radiographic_findings" value={form.radiographic_findings} onChange={handleChange} textarea rows={4} />
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Diagnóstico y plan de tratamiento" icon={Crosshair} accent="emerald" subtitle="Debe quedar congruente con la exploración y el consentimiento informado.">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Field label="Diagnóstico principal" name="primary_diagnosis" value={form.primary_diagnosis} onChange={handleChange} textarea rows={4} required />
-              <Field label="Diagnósticos secundarios" name="secondary_diagnoses" value={form.secondary_diagnoses} onChange={handleChange} textarea rows={4} helpText="Uno por línea o separado por comas." />
-              <Field label="Código ICD-10" name="icd10_code" value={form.icd10_code} onChange={handleChange} placeholder="Opcional" />
-              <Field label="Fundamento diagnóstico" name="diagnostic_basis" value={form.diagnostic_basis} onChange={handleChange} textarea rows={4} />
-              <Field label="Objetivo terapéutico" name="treatment_objective" value={form.treatment_objective} onChange={handleChange} textarea rows={4} />
-              <Field label="Costo estimado" name="estimated_cost" value={form.estimated_cost} onChange={handleChange} type="number" placeholder="0" />
-            </div>
-
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Procedimientos propuestos</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Agrega tratamientos, pieza y código si aplica.</div>
+          ) : (
+            <>
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-3 overflow-x-auto">
+                <div className="flex items-center gap-2 min-w-max">
+                  {[
+                    { key: 'history', label: 'Historia' },
+                    { key: 'interview', label: 'Interrogatorio' },
+                    { key: 'exploration', label: 'Exploración' },
+                    { key: 'diagnosisPlan', label: 'Diagnóstico & Plan' },
+                    { key: 'odontogram', label: 'Odontograma' },
+                    { key: 'consents', label: 'Consentimientos' },
+                    { key: 'summary', label: 'Resumen' },
+                  ].map((step, idx) => (
+                    <button
+                      key={step.key}
+                      onClick={() => setActiveStep(step.key)}
+                      className={`px-3 py-2 rounded-lg text-sm font-black transition-all ${activeStep === step.key ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-700 border border-slate-200'}`}
+                    >
+                      {idx + 1}. {step.label}
+                    </button>
+                  ))}
                 </div>
-                <button type="button" onClick={addProcedure} className="text-[10px] font-black uppercase tracking-[0.18em] px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800">
-                  + Agregar procedimiento
-                </button>
               </div>
-              <div className="space-y-4">
-                {form.proposed_procedures.map((procedure, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-white rounded-xl border border-slate-200 p-4">
-                    <div className="md:col-span-6">
-                      <input
-                        className="w-full border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20 bg-white"
-                        placeholder="Procedimiento"
-                        value={procedure.name}
-                        onChange={(e) => updateProcedure(index, 'name', e.target.value)}
-                      />
+
+              <div className="space-y-6">
+                <SectionCard title="Ficha de identificación" icon={Building2} subtitle="Datos del paciente en una vista resumida y limpia.">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm text-slate-700">
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Nombre completo</div>
+                      <div className="font-bold">{patient?.first_name} {patient?.last_name}</div>
                     </div>
-                    <div className="md:col-span-3">
-                      <input
-                        className="w-full border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20 bg-white"
-                        placeholder="Pieza dental"
-                        value={procedure.tooth}
-                        onChange={(e) => updateProcedure(index, 'tooth', e.target.value)}
-                      />
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Contacto</div>
+                      <div className="font-bold">{patient?.phone || 'No registrado'}</div>
                     </div>
-                    <div className="md:col-span-2">
-                      <input
-                        className="w-full border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20 bg-white"
-                        placeholder="Código"
-                        value={procedure.code}
-                        onChange={(e) => updateProcedure(index, 'code', e.target.value)}
-                      />
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Correo</div>
+                      <div className="font-bold">{patient?.email || 'No registrado'}</div>
                     </div>
-                    <div className="md:col-span-1 flex items-center justify-end">
-                      {form.proposed_procedures.length > 1 && (
-                        <button type="button" onClick={() => removeProcedure(index)} className="text-rose-600 hover:text-rose-700 p-2">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Contacto de emergencia</div>
+                      <div className="font-bold">{patient?.emergency_contact || 'No registrado'}</div>
                     </div>
                   </div>
-                ))}
+                </SectionCard>
+
+                {activeStep === 'history' && (
+                  <SectionCard title="Historia clínica" icon={Clipboard} accent="slate" subtitle="Antecedentes heredofamiliares, patológicos, no patológicos y odontológicos.">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <Field label="Heredofamiliares" name="family_history" value={form.family_history} onChange={handleChange} textarea rows={4} />
+                      <Field label="Patológicos" name="pathological_history" value={form.pathological_history} onChange={handleChange} textarea rows={4} />
+                      <Field label="No patológicos" name="non_pathological_history" value={form.non_pathological_history} onChange={handleChange} textarea rows={4} />
+                      <Field label="Quirúrgicos / hospitalarios" name="surgeries" value={form.surgeries} onChange={handleChange} textarea rows={4} />
+                      <Field label="Alergias" name="allergies" value={form.allergies} onChange={handleChange} textarea rows={4} required helpText="Campo de alto riesgo clínico." />
+                      <Field label="Medicación actual" name="current_medications" value={form.current_medications} onChange={handleChange} textarea rows={4} />
+                      <Field label="Historia dental" name="dental_history" value={form.dental_history} onChange={handleChange} textarea rows={4} />
+                      <Field label="Frecuencia de cepillado" name="brushing_frequency" value={form.brushing_frequency} onChange={handleChange} placeholder="Ej. 3 veces al día" />
+                    </div>
+                    <label className="flex items-center gap-3 text-sm font-bold text-slate-700 pt-2">
+                      <input type="checkbox" name="use_floss" checked={form.use_floss} onChange={handleChange} className="w-5 h-5 accent-slate-900" />
+                      Utiliza hilo dental
+                    </label>
+                  </SectionCard>
+                )}
+
+                {activeStep === 'interview' && (
+                  <SectionCard title="Interrogatorio" icon={FileText} accent="amber" subtitle="Motivo de consulta, dolor y síntomas relevantes.">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <Field label="Motivo de consulta" name="chief_complaint" value={form.chief_complaint} onChange={handleChange} textarea rows={4} required />
+                      <Field label="Fecha de inicio de síntomas" name="symptoms_start_date" value={form.symptoms_start_date} onChange={handleChange} type="date" />
+                      <Field label="Presencia de dolor" name="pain_presence" value={form.pain_presence} onChange={handleChange} type="checkbox" placeholder="Registrar presencia de dolor" />
+                      <Field label="Intensidad del dolor (0-10)" name="pain_intensity" value={form.pain_intensity} onChange={handleChange} type="number" />
+                      <Field label="Carácter del dolor" name="pain_character" value={form.pain_character} onChange={handleChange} placeholder="Ej. punzante, sordo, pulsátil" />
+                      <Field label="Localización" name="pain_location" value={form.pain_location} onChange={handleChange} placeholder="Ej. molar inferior derecho" />
+                      <Field label="Factores desencadenantes" name="pain_triggers" value={form.pain_triggers} onChange={handleChange} textarea rows={3} />
+                      <Field label="Alivio" name="pain_relief" value={form.pain_relief} onChange={handleChange} textarea rows={3} />
+                    </div>
+                    <Field label="Revisión por sistemas" name="review_of_systems" value={form.review_of_systems} onChange={handleChange} textarea rows={4} />
+                  </SectionCard>
+                )}
+
+                {activeStep === 'exploration' && (
+                  <SectionCard title="Exploración clínica" icon={Brush} accent="slate" subtitle="Hallazgos extraorales, intraorales, periodontales y radiográficos.">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <Field label="Exploración extraoral" name="extraoral_exam" value={form.extraoral_exam} onChange={handleChange} textarea rows={4} />
+                      <Field label="Exploración intraoral" name="intraoral_exam" value={form.intraoral_exam} onChange={handleChange} textarea rows={4} />
+                      <Field label="Estado periodontal" name="periodontal_status" value={form.periodontal_status} onChange={handleChange} textarea rows={4} />
+                      <Field label="Hallazgos radiográficos" name="radiographic_findings" value={form.radiographic_findings} onChange={handleChange} textarea rows={4} />
+                    </div>
+                  </SectionCard>
+                )}
+
+                {activeStep === 'diagnosisPlan' && (
+                  <SectionCard title="Diagnóstico y plan de tratamiento" icon={Crosshair} accent="emerald" subtitle="Debe quedar congruente con la exploración y el consentimiento informado.">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <Field label="Diagnóstico principal" name="primary_diagnosis" value={form.primary_diagnosis} onChange={handleChange} textarea rows={4} required />
+                      <Field label="Diagnósticos secundarios" name="secondary_diagnoses" value={form.secondary_diagnoses} onChange={handleChange} textarea rows={4} helpText="Uno por línea o separado por comas." />
+                      <Field label="Código ICD-10" name="icd10_code" value={form.icd10_code} onChange={handleChange} placeholder="Opcional" />
+                      <Field label="Fundamento diagnóstico" name="diagnostic_basis" value={form.diagnostic_basis} onChange={handleChange} textarea rows={4} />
+                      <Field label="Objetivo terapéutico" name="treatment_objective" value={form.treatment_objective} onChange={handleChange} textarea rows={4} />
+                      <Field label="Costo estimado" name="estimated_cost" value={form.estimated_cost} onChange={handleChange} type="number" placeholder="0" />
+                    </div>
+
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Procedimientos propuestos</div>
+                          <div className="text-[11px] text-slate-400 mt-1">Agrega tratamientos, pieza y código si aplica.</div>
+                        </div>
+                        <button type="button" onClick={addProcedure} className="text-[10px] font-black uppercase tracking-[0.18em] px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800">
+                          + Agregar procedimiento
+                        </button>
+                      </div>
+                      <div className="space-y-4">
+                        {form.proposed_procedures.map((procedure, index) => (
+                          <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-white rounded-xl border border-slate-200 p-4">
+                            <div className="md:col-span-6">
+                              <input className="w-full border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20 bg-white" placeholder="Procedimiento" value={procedure.name} onChange={(e) => updateProcedure(index, 'name', e.target.value)} />
+                            </div>
+                            <div className="md:col-span-3">
+                              <input className="w-full border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20 bg-white" placeholder="Pieza dental" value={procedure.tooth} onChange={(e) => updateProcedure(index, 'tooth', e.target.value)} />
+                            </div>
+                            <div className="md:col-span-2">
+                              <input className="w-full border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20 bg-white" placeholder="Código" value={procedure.code} onChange={(e) => updateProcedure(index, 'code', e.target.value)} />
+                            </div>
+                            <div className="md:col-span-1 flex items-center justify-end">
+                              {form.proposed_procedures.length > 1 && (
+                                <button type="button" onClick={() => removeProcedure(index)} className="text-rose-600 hover:text-rose-700 p-2">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                      <Field label="Plan de tratamiento" name="treatment_plan" value={form.treatment_plan} onChange={handleChange} textarea rows={5} required />
+                      <Field label="Riesgos explicados" name="risks_explained" value={form.risks_explained} onChange={handleChange} textarea rows={5} required />
+                      <Field label="Alternativas explicadas" name="alternatives_explained" value={form.alternatives_explained} onChange={handleChange} textarea rows={5} required />
+                      <Field label="Seguimiento / controles" name="follow_up_plan" value={form.follow_up_plan} onChange={handleChange} textarea rows={5} required />
+                      <Field label="Resumen clínico del expediente" name="note_summary" value={form.note_summary} onChange={handleChange} textarea rows={4} helpText="Se usa como resumen estructural de la evolución clínica." />
+                    </div>
+
+                    <div className="pt-2">
+                      <label className="flex items-center gap-3 text-sm font-bold text-slate-700 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                        <input type="checkbox" name="close_record" checked={form.close_record} onChange={handleChange} className="w-5 h-5 accent-slate-900" />
+                        Cerrar expediente al guardar esta versión
+                      </label>
+                    </div>
+                  </SectionCard>
+                )}
+
+                {activeStep === 'odontogram' && (
+                  <SectionCard title="Odontograma" icon={Building2} accent="amber" subtitle="Captura visual por pieza dental con historial por diente.">
+                    <OdontogramVisualizer
+                      value={toVisualizerOdontogram(form.tooth_entries)}
+                      onChange={(records) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          tooth_entries: fromVisualizerOdontogram(records),
+                        }));
+                      }}
+                      subtitle="Haz clic en una pieza para abrir el panel lateral y registrar cambios clínicos."
+                    />
+                  </SectionCard>
+                )}
+
+                {activeStep === 'consents' && (
+                  <SectionCard title="Consentimientos" icon={ShieldCheck} accent="slate" subtitle="Debes capturar aceptación explícita para datos sensibles, tratamiento y WhatsApp.">
+                    <div className="grid grid-cols-1 gap-5">
+                      {Object.keys(CONSENT_LIBRARY).map((type) => (
+                        <ConsentCard key={type} type={type} draft={consentDrafts[type]} onToggle={handleConsentToggle} />
+                      ))}
+                    </div>
+                  </SectionCard>
+                )}
+
+                {activeStep === 'summary' && (
+                  <SectionCard title="Resumen clínico" icon={Clipboard} accent="slate" subtitle="Resumen estructurado para lectura rápida y continuidad clínica.">
+                    <Field label="Resumen clínico del expediente" name="note_summary" value={form.note_summary} onChange={handleChange} textarea rows={6} helpText="Este texto se usa como sinopsis del expediente clínico." />
+                    <div className="flex gap-4 pt-4">
+                      <button onClick={() => setActiveStep('diagnosisPlan')} className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">Volver</button>
+                      <button onClick={handleSave} disabled={saving} className="px-4 py-3 bg-slate-900 text-white rounded-xl">{saving ? 'Sincronizando...' : 'Guardar expediente'}</button>
+                    </div>
+                  </SectionCard>
+                )}
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-              <Field label="Plan de tratamiento" name="treatment_plan" value={form.treatment_plan} onChange={handleChange} textarea rows={5} required />
-              <Field label="Riesgos explicados" name="risks_explained" value={form.risks_explained} onChange={handleChange} textarea rows={5} required />
-              <Field label="Alternativas explicadas" name="alternatives_explained" value={form.alternatives_explained} onChange={handleChange} textarea rows={5} required />
-              <Field label="Seguimiento / controles" name="follow_up_plan" value={form.follow_up_plan} onChange={handleChange} textarea rows={5} required />
-              <Field label="Resumen clínico del expediente" name="note_summary" value={form.note_summary} onChange={handleChange} textarea rows={4} helpText="Se usa como resumen estructural de la evolución clínica." />
-            </div>
-
-            <div className="pt-2">
-              <label className="flex items-center gap-3 text-sm font-bold text-slate-700 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                <input type="checkbox" name="close_record" checked={form.close_record} onChange={handleChange} className="w-5 h-5 accent-slate-900" />
-                Cerrar expediente al guardar esta versión
-              </label>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Odontograma" icon={Building2} accent="amber" subtitle="Captura visual por pieza dental con historial por diente.">
-            <OdontogramVisualizer
-              value={toVisualizerOdontogram(form.tooth_entries)}
-              onChange={(records) => {
-                setForm((prev) => ({
-                  ...prev,
-                  tooth_entries: fromVisualizerOdontogram(records),
-                }));
-              }}
-              subtitle="Haz clic en una pieza para abrir el panel lateral y registrar cambios clínicos."
-            />
-          </SectionCard>
-
-          <SectionCard title="Consentimientos" icon={ShieldCheck} accent="slate" subtitle="Debes capturar aceptación explícita para datos sensibles, tratamiento y WhatsApp.">
-            <div className="grid grid-cols-1 gap-5">
-              {Object.keys(CONSENT_LIBRARY).map((type) => (
-                <ConsentCard key={type} type={type} draft={consentDrafts[type]} onToggle={handleConsentToggle} />
-              ))}
-            </div>
-          </SectionCard>
+            </>
+          )}
         </div>
 
         <div className="lg:col-span-4 space-y-8 sticky top-8">
