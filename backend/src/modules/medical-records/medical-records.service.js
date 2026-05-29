@@ -214,7 +214,7 @@ class MedicalRecordsService {
 
     const record = await this.getOrCreateRecord(doctorId, patientId);
 
-    const [versions, noteVersions, odontograms, consents, auditLogs] =
+    const [versions, noteVersions, notes, odontograms, consents, auditLogs] =
       await Promise.all([
         db.medicalRecordVersion.findMany({
           where: { medical_record_id: record.id },
@@ -246,6 +246,38 @@ class MedicalRecordsService {
                 role: true,
                 license_number: true,
                 specialty: true,
+              },
+            },
+          },
+        }),
+        db.medicalNote.findMany({
+          where: { medical_record_id: record.id },
+          orderBy: { created_at: "desc" },
+          take: 100,
+          include: {
+            author: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                role: true,
+                license_number: true,
+                specialty: true,
+              },
+            },
+            appointment: {
+              select: {
+                id: true,
+                start_time: true,
+                end_time: true,
+                status: true,
+                reason: true,
+                clinic: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
           },
@@ -304,6 +336,7 @@ class MedicalRecordsService {
     return {
       record,
       versions,
+      notes,
       note_versions: noteVersions,
       odontograms,
       consents,

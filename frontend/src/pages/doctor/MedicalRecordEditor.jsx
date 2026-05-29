@@ -88,6 +88,13 @@ const EMPTY_RECORD = {
   intraoral_exam: '',
   periodontal_status: '',
   radiographic_findings: '',
+  blood_pressure: '',
+  heart_rate: '',
+  respiratory_rate: '',
+  temperature: '',
+  oxygen_saturation: '',
+  weight_kg: '',
+  height_cm: '',
   primary_diagnosis: '',
   secondary_diagnoses: '',
   icd10_code: '',
@@ -164,6 +171,15 @@ const buildClinicalNotesPayload = (form) => ({
       intraoral_exam: form.intraoral_exam,
       periodontal_status: form.periodontal_status,
       radiographic_findings: form.radiographic_findings,
+      vital_signs: {
+        blood_pressure: form.blood_pressure,
+        heart_rate: form.heart_rate,
+        respiratory_rate: form.respiratory_rate,
+        temperature: form.temperature,
+        oxygen_saturation: form.oxygen_saturation,
+        weight_kg: form.weight_kg,
+        height_cm: form.height_cm,
+      },
     },
     diagnosis: {
       primary_diagnosis: form.primary_diagnosis,
@@ -346,6 +362,15 @@ const hydrateRecord = (recordData) => {
   nextState.periodontal_status = clinicalNotes.exploration.periodontal_status || exploration.periodontal_status || '';
   nextState.radiographic_findings = clinicalNotes.exploration.radiographic_findings || exploration.radiographic_findings || '';
 
+  const vitalSigns = clinicalNotes.exploration.vital_signs || exploration.vital_signs || {};
+  nextState.blood_pressure = vitalSigns.blood_pressure || '';
+  nextState.heart_rate = vitalSigns.heart_rate || '';
+  nextState.respiratory_rate = vitalSigns.respiratory_rate || '';
+  nextState.temperature = vitalSigns.temperature || '';
+  nextState.oxygen_saturation = vitalSigns.oxygen_saturation || '';
+  nextState.weight_kg = vitalSigns.weight_kg || '';
+  nextState.height_cm = vitalSigns.height_cm || '';
+
   nextState.primary_diagnosis = clinicalNotes.diagnosis.primary_diagnosis || diagnosis.primary_diagnosis || recordData?.diagnosis || '';
   nextState.secondary_diagnoses = Array.isArray(clinicalNotes.diagnosis.secondary_diagnoses)
     ? clinicalNotes.diagnosis.secondary_diagnoses.join('\n')
@@ -497,6 +522,7 @@ export default function MedicalRecordEditor() {
   const [prescInstructions, setPrescInstructions] = useState('');
   const [sessionNote, setSessionNote] = useState('');
   const [sessionPrice, setSessionPrice] = useState('500');
+  const [selectedVisitId, setSelectedVisitId] = useState(null);
   const patientSignatureRef = useRef(null);
 
   useEffect(() => {
@@ -536,6 +562,13 @@ export default function MedicalRecordEditor() {
       const latestConsents = extractLatestConsentState(consentsRes.data.data || []);
       setConsentDrafts(latestConsents);
       setBaselineConsents(latestConsents);
+
+      const visitNotes = historyRes.data.data?.notes || [];
+      if (visitNotes.length > 0) {
+        setSelectedVisitId(visitNotes[0].id);
+      } else {
+        setSelectedVisitId(null);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       Swal.fire({
@@ -548,6 +581,24 @@ export default function MedicalRecordEditor() {
       setLoading(false);
     }
   };
+
+  const visitHistory = (recordHistory.notes && recordHistory.notes.length > 0)
+    ? recordHistory.notes
+    : (recordHistory.note_versions || []).map((note) => ({
+        id: note.id,
+        created_at: note.created_at,
+        content: note.content,
+        note_type: note.note_type,
+        author: note.creator,
+        appointment: null,
+      }));
+
+  const selectedVisit = visitHistory.find((visit) => visit.id === selectedVisitId) || null;
+
+  const previousVisits = visitHistory.filter((visit) => {
+    if (!appointmentId) return true;
+    return visit.appointment?.id !== appointmentId;
+  });
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -945,27 +996,84 @@ export default function MedicalRecordEditor() {
         <div className="lg:col-span-12 space-y-12">
           {!fullView && appointmentId ? (
             <SectionCard title="Nota de evolución (consulta)" icon={Stethoscope} accent="emerald" subtitle="Registra únicamente la nota clínica de la cita y enlázala al expediente completo si lo necesitas.">
-              <div className="space-y-4">
-                <textarea
-                  className="w-full border-2 border-slate-100 rounded-xl p-5 text-sm outline-none focus:border-slate-900 min-h-[220px] font-medium transition-all shadow-inner bg-slate-50/50"
-                  placeholder="Describe hallazgos, procedimientos realizados, evolución y recomendaciones del día..."
-                  value={sessionNote}
-                  onChange={(e) => setSessionNote(e.target.value)}
-                />
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
-                  <Field
-                    label="Honorarios de sesión"
-                    name="sessionPrice"
-                    value={sessionPrice}
-                    onChange={(e) => setSessionPrice(e.target.value)}
-                    type="number"
-                    placeholder="500"
-                    helpText="Se sincroniza con la cita cuando guardes la consulta."
-                    className="max-w-xs"
+              <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
+                <div className="space-y-4">
+                  <textarea
+                    className="w-full border-2 border-slate-100 rounded-xl p-5 text-sm outline-none focus:border-slate-900 min-h-[220px] font-medium transition-all shadow-inner bg-slate-50/50"
+                    placeholder="Describe hallazgos, procedimientos realizados, evolución y recomendaciones del día..."
+                    value={sessionNote}
+                    onChange={(e) => setSessionNote(e.target.value)}
                   />
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button onClick={() => setFullView(true)} className="px-4 py-3 bg-slate-900 text-white rounded-xl font-black uppercase text-[11px]">Ir al expediente</button>
-                    <button onClick={handleSave} className="px-4 py-3 bg-emerald-600 text-white rounded-xl font-black uppercase text-[11px]">Guardar nota</button>
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
+                    <Field
+                      label="Honorarios de sesión"
+                      name="sessionPrice"
+                      value={sessionPrice}
+                      onChange={(e) => setSessionPrice(e.target.value)}
+                      type="number"
+                      placeholder="500"
+                      helpText="Se sincroniza con la cita cuando guardes la consulta."
+                      className="max-w-xs"
+                    />
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button onClick={() => setFullView(true)} className="px-4 py-3 bg-slate-900 text-white rounded-xl font-black uppercase text-[11px]">Ir al expediente</button>
+                      <button onClick={handleSave} className="px-4 py-3 bg-emerald-600 text-white rounded-xl font-black uppercase text-[11px]">Guardar nota</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Visitas anteriores</p>
+                    <p className="text-xs text-slate-500 mt-1">Consulta el historial y abre cada visita para ver sus observaciones.</p>
+                  </div>
+
+                  <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1">
+                    {previousVisits.length > 0 ? previousVisits.map((visit) => {
+                      const isActive = selectedVisitId === visit.id;
+                      return (
+                        <button
+                          key={visit.id}
+                          type="button"
+                          onClick={() => setSelectedVisitId(visit.id)}
+                          className={`w-full text-left rounded-xl border px-3 py-3 transition-all ${isActive ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'}`}
+                        >
+                          <p className={`text-[10px] font-black uppercase tracking-[0.18em] ${isActive ? 'text-slate-200' : 'text-slate-500'}`}>
+                            {visit.appointment?.start_time
+                              ? new Date(visit.appointment.start_time).toLocaleDateString('es-MX', { dateStyle: 'medium' })
+                              : new Date(visit.created_at).toLocaleDateString('es-MX', { dateStyle: 'medium' })}
+                          </p>
+                          <p className={`text-xs mt-1 line-clamp-2 ${isActive ? 'text-white' : 'text-slate-700'}`}>
+                            {visit.content || 'Sin observaciones registradas.'}
+                          </p>
+                        </button>
+                      );
+                    }) : (
+                      <p className="text-[11px] text-slate-400 italic">Aún no hay visitas anteriores registradas.</p>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 min-h-[150px]">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500 mb-2">Detalle de visita</p>
+                    {selectedVisit ? (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-slate-500">
+                          {selectedVisit.author
+                            ? `Dr(a). ${selectedVisit.author.first_name || ''} ${selectedVisit.author.last_name || ''}`.trim()
+                            : 'Autor no disponible'}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          {selectedVisit.appointment?.start_time
+                            ? `Fecha de cita: ${new Date(selectedVisit.appointment.start_time).toLocaleString('es-MX')}`
+                            : `Registrada: ${new Date(selectedVisit.created_at).toLocaleString('es-MX')}`}
+                        </p>
+                        <p className="text-sm text-slate-700 leading-6 whitespace-pre-wrap">
+                          {selectedVisit.content || 'Sin observaciones registradas.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 italic">Selecciona una visita para ver sus observaciones.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1054,6 +1162,18 @@ export default function MedicalRecordEditor() {
 
                 {activeStep === 'exploration' && (
                   <SectionCard title="Exploración clínica" icon={Brush} accent="slate" subtitle="Hallazgos extraorales, intraorales, periodontales y radiográficos.">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500 mb-4">Signos vitales</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                        <Field label="TA (mmHg)" name="blood_pressure" value={form.blood_pressure} onChange={handleChange} placeholder="120/80" />
+                        <Field label="FC (lpm)" name="heart_rate" value={form.heart_rate} onChange={handleChange} placeholder="72" />
+                        <Field label="FR (rpm)" name="respiratory_rate" value={form.respiratory_rate} onChange={handleChange} placeholder="16" />
+                        <Field label="Temp (°C)" name="temperature" value={form.temperature} onChange={handleChange} placeholder="36.5" />
+                        <Field label="SpO2 (%)" name="oxygen_saturation" value={form.oxygen_saturation} onChange={handleChange} placeholder="98" />
+                        <Field label="Peso (kg)" name="weight_kg" value={form.weight_kg} onChange={handleChange} placeholder="70" />
+                        <Field label="Talla (cm)" name="height_cm" value={form.height_cm} onChange={handleChange} placeholder="170" />
+                      </div>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <Field label="Exploración extraoral" name="extraoral_exam" value={form.extraoral_exam} onChange={handleChange} textarea rows={4} />
                       <Field label="Exploración intraoral" name="intraoral_exam" value={form.intraoral_exam} onChange={handleChange} textarea rows={4} />

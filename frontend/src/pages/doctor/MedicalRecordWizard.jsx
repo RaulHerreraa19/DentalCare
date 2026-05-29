@@ -73,6 +73,13 @@ const EMPTY_RECORD = {
   intraoral_exam: '',
   periodontal_status: '',
   radiographic_findings: '',
+  blood_pressure: '',
+  heart_rate: '',
+  respiratory_rate: '',
+  temperature: '',
+  oxygen_saturation: '',
+  weight_kg: '',
+  height_cm: '',
   primary_diagnosis: '',
   secondary_diagnoses: '',
   icd10_code: '',
@@ -148,6 +155,15 @@ const buildClinicalNotesPayload = (form, odontogramRecords) => ({
       intraoral_exam: form.intraoral_exam,
       periodontal_status: form.periodontal_status,
       radiographic_findings: form.radiographic_findings,
+      vital_signs: {
+        blood_pressure: form.blood_pressure,
+        heart_rate: form.heart_rate,
+        respiratory_rate: form.respiratory_rate,
+        temperature: form.temperature,
+        oxygen_saturation: form.oxygen_saturation,
+        weight_kg: form.weight_kg,
+        height_cm: form.height_cm,
+      },
     },
     diagnosis: {
       primary_diagnosis: form.primary_diagnosis,
@@ -173,13 +189,24 @@ const buildClinicalNotesPayload = (form, odontogramRecords) => ({
 });
 
 const normalizeRecord = (data = {}) => ({
+  const explorationFromNotes = extractClinicalNotes(data).exploration || {};
+  const vitalSigns = explorationFromNotes.vital_signs || {};
+
+  return ({
   ...EMPTY_RECORD,
   ...extractClinicalNotes(data).history,
   ...extractClinicalNotes(data).interview,
-  ...extractClinicalNotes(data).exploration,
+  ...explorationFromNotes,
   ...extractClinicalNotes(data).diagnosis,
   ...extractClinicalNotes(data).plan,
   ...data,
+  blood_pressure: vitalSigns.blood_pressure || '',
+  heart_rate: vitalSigns.heart_rate || '',
+  respiratory_rate: vitalSigns.respiratory_rate || '',
+  temperature: vitalSigns.temperature || '',
+  oxygen_saturation: vitalSigns.oxygen_saturation || '',
+  weight_kg: vitalSigns.weight_kg || '',
+  height_cm: vitalSigns.height_cm || '',
   proposed_procedures: Array.isArray(extractClinicalNotes(data).plan?.proposed_procedures) && extractClinicalNotes(data).plan.proposed_procedures.length > 0
     ? extractClinicalNotes(data).plan.proposed_procedures
     : Array.isArray(data?.proposed_procedures) && data.proposed_procedures.length > 0
@@ -190,7 +217,8 @@ const normalizeRecord = (data = {}) => ({
     : normalizeToothEntries(extractClinicalNotes(data).odontogram?.tooth_data || data?.tooth_data || data?.odontogram || []),
   note_summary: extractClinicalNotes(data).note_summary || data?.note_summary || '',
   close_record: data?.status === 'CLOSED',
-});
+  });
+};
 
 const STEPS = [
   { id: 1, label: 'Paciente', icon: User },
@@ -628,6 +656,81 @@ export default function MedicalRecordWizard() {
           {/* Step 4: Examination */}
           {currentStep === 4 && (
             <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold text-slate-700 mb-3">Signos Vitales</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">TA (mmHg)</label>
+                    <input
+                      type="text"
+                      value={record.blood_pressure || ''}
+                      onChange={(e) => handleInputChange('blood_pressure', e.target.value)}
+                      placeholder="120/80"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">FC (lpm)</label>
+                    <input
+                      type="text"
+                      value={record.heart_rate || ''}
+                      onChange={(e) => handleInputChange('heart_rate', e.target.value)}
+                      placeholder="72"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">FR (rpm)</label>
+                    <input
+                      type="text"
+                      value={record.respiratory_rate || ''}
+                      onChange={(e) => handleInputChange('respiratory_rate', e.target.value)}
+                      placeholder="16"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Temp (°C)</label>
+                    <input
+                      type="text"
+                      value={record.temperature || ''}
+                      onChange={(e) => handleInputChange('temperature', e.target.value)}
+                      placeholder="36.5"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">SpO2 (%)</label>
+                    <input
+                      type="text"
+                      value={record.oxygen_saturation || ''}
+                      onChange={(e) => handleInputChange('oxygen_saturation', e.target.value)}
+                      placeholder="98"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Peso (kg)</label>
+                    <input
+                      type="text"
+                      value={record.weight_kg || ''}
+                      onChange={(e) => handleInputChange('weight_kg', e.target.value)}
+                      placeholder="70"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Talla (cm)</label>
+                    <input
+                      type="text"
+                      value={record.height_cm || ''}
+                      onChange={(e) => handleInputChange('height_cm', e.target.value)}
+                      placeholder="170"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-900 mb-2">
                   Examen Extraoral
