@@ -407,7 +407,7 @@ export default function MedicalRecordWizard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigate(-1)}
@@ -424,7 +424,7 @@ export default function MedicalRecordWizard() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <div className="w-full px-4 py-8 sm:px-6 lg:px-8">
         {/* Stepper */}
         <div className="mb-8">
           <div className="flex items-center justify-between">

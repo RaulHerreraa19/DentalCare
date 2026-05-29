@@ -12,7 +12,10 @@ router.get("/", MedicalRecordsController.getAllRecords);
 router.get("/:patientId/history", MedicalRecordsController.getHistory);
 router.get("/:patientId/consents", MedicalRecordsController.listConsents);
 router.post("/:patientId/consents", MedicalRecordsController.upsertConsent);
-router.post("/:patientId/signature", MedicalRecordsController.savePatientSignature);
+router.post(
+  "/:patientId/signature",
+  MedicalRecordsController.savePatientSignature,
+);
 router.get("/:patientId", MedicalRecordsController.getRecord);
 router.patch("/:patientId", MedicalRecordsController.updateRecord);
 router.post("/:patientId/notes", MedicalRecordsController.addNote);

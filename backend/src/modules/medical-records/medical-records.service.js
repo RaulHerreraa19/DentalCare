@@ -56,7 +56,10 @@ const normalizeToothData = (value) => {
 };
 
 const extractBase64ImageBuffer = (value) => {
-  const base64Data = String(value || "").replace(/^data:image\/\w+;base64,/, "");
+  const base64Data = String(value || "").replace(
+    /^data:image\/\w+;base64,/,
+    "",
+  );
   if (!base64Data) {
     return null;
   }
@@ -497,7 +500,13 @@ class MedicalRecordsService {
     return note;
   }
 
-  static async savePatientSignature(doctorId, patientId, data, ipAddress, userAgent) {
+  static async savePatientSignature(
+    doctorId,
+    patientId,
+    data,
+    ipAddress,
+    userAgent,
+  ) {
     const patient = await db.patient.findUnique({ where: { id: patientId } });
     if (!patient) throw new AppError("Paciente no encontrado", 404);
 
@@ -518,13 +527,15 @@ class MedicalRecordsService {
     const patientSignatureAt = new Date();
     const signatureHash = crypto
       .createHash("sha256")
-      .update([
-        record.id,
-        patientId,
-        signatureUrl,
-        patientSignatureAt.toISOString(),
-        process.env.SIGNATURE_SALT || "dental-care-salt-2026",
-      ].join("|"))
+      .update(
+        [
+          record.id,
+          patientId,
+          signatureUrl,
+          patientSignatureAt.toISOString(),
+          process.env.SIGNATURE_SALT || "dental-care-salt-2026",
+        ].join("|"),
+      )
       .digest("hex");
 
     const updatedRecord = await db.medicalRecord.update({
