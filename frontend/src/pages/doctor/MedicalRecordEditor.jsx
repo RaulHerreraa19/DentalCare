@@ -942,7 +942,7 @@ export default function MedicalRecordEditor() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        <div className="lg:col-span-8 space-y-8">
+        <div className="lg:col-span-12 space-y-12">
           {!fullView && appointmentId ? (
             <SectionCard title="Nota de evolución (consulta)" icon={Stethoscope} accent="emerald" subtitle="Registra únicamente la nota clínica de la cita y enlázala al expediente completo si lo necesitas.">
               <div className="space-y-4">
