@@ -385,7 +385,7 @@ export default function DoctorPatients() {
                 <Input label="Fecha de nacimiento" type="date" required value={formData.date_of_birth} onChange={(e) => setFormData((current) => ({ ...current, date_of_birth: e.target.value }))} />
                 <SelectControl label="Género" required value={formData.gender} onChange={(e) => setFormData((current) => ({ ...current, gender: e.target.value }))} options={genderOptions} />
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-4">
                 <Input label="CURP" value={formData.curp} maxLength={18} onChange={(e) => setFormData((current) => ({ ...current, curp: e.target.value.toUpperCase() }))} />
               </div>
             </div>
