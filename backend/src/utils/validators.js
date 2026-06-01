@@ -92,9 +92,14 @@ const CURP_REGEX = /^[A-Z0-9]{18}$/;
 
 const assertOptionalCurp = (value, fieldLabel = "El CURP") => {
   if (value === undefined || value === null || value === "") return null;
-  const sanitized = String(value || "").trim().toUpperCase();
+  const sanitized = String(value || "")
+    .trim()
+    .toUpperCase();
   if (!CURP_REGEX.test(sanitized)) {
-    throw new AppError(`${fieldLabel} no tiene un formato válido (18 caracteres alfanuméricos).`, 400);
+    throw new AppError(
+      `${fieldLabel} no tiene un formato válido (18 caracteres alfanuméricos).`,
+      400,
+    );
   }
   return sanitized;
 };

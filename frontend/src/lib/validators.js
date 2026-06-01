@@ -26,9 +26,14 @@ export const isValidPhone = (value = "") => {
 };
 
 export const isValidCurp = (value = "") => {
-  const raw = String(value || "").trim().toUpperCase();
+  const raw = String(value || "")
+    .trim()
+    .toUpperCase();
   if (!raw) return false;
   return /^[A-Z0-9]{18}$/.test(raw);
 };
 
-export const normalizeCurp = (value = "") => String(value || "").trim().toUpperCase();
+export const normalizeCurp = (value = "") =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
