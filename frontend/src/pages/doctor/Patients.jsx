@@ -386,7 +386,7 @@ export default function DoctorPatients() {
                 <SelectControl label="Género" required value={formData.gender} onChange={(e) => setFormData((current) => ({ ...current, gender: e.target.value }))} options={genderOptions} />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <Input label="CURP" value={formData.curp} onChange={(e) => setFormData((current) => ({ ...current, curp: e.target.value }))} />
+                <Input label="CURP" value={formData.curp} maxLength={18} onChange={(e) => setFormData((current) => ({ ...current, curp: e.target.value.toUpperCase() }))} />
               </div>
             </div>
 

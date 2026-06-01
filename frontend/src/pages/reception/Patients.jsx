@@ -65,7 +65,8 @@ export default function Patients() {
     email: '',
     date_of_birth: '',
     gender: '',
-    address: ''
+    address: '',
+    emergency_contact: '',
   });
   const [unauthorized, setUnauthorized] = useState(false);
 
@@ -195,7 +196,7 @@ export default function Patients() {
   const resetPatientModal = () => {
     setShowModal(false);
     setEditingPatient(null);
-    setFormData({ first_name: '', last_name: '', phone: '', email: '', date_of_birth: '', gender: '', address: '' });
+    setFormData({ first_name: '', last_name: '', curp: '', phone: '', email: '', date_of_birth: '', gender: '', address: '', emergency_contact: '' });
   };
 
   const openEditModal = (patient) => {
@@ -209,6 +210,7 @@ export default function Patients() {
       date_of_birth: patient.date_of_birth ? String(patient.date_of_birth).slice(0, 10) : '',
       gender: patient.gender || '',
       address: patient.address || '',
+      emergency_contact: patient.emergency_contact || '',
     });
     setShowModal(true);
   };
@@ -239,6 +241,7 @@ export default function Patients() {
           ...formData,
           email: safeEmail,
           phone: normalizePhone(formData.phone),
+          curp: formData.curp ? formData.curp.trim().toUpperCase() : undefined,
         });
         await Swal.fire({ icon: 'success', title: 'Paciente Actualizado', text: 'Los datos básicos del paciente fueron actualizados correctamente.', confirmButtonColor: '#0f172a', timer: 2000 });
       } else {
@@ -389,7 +392,8 @@ export default function Patients() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Input label="CURP" value={formData.curp} onChange={(e) => setFormData({ ...formData, curp: e.target.value })} />
+            <Input label="CURP" value={formData.curp} maxLength={18} onChange={(e) => setFormData({ ...formData, curp: e.target.value.toUpperCase() })} />
+            <Input label="Contacto de emergencia" value={formData.emergency_contact} onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })} />
           </div>
 
           <Input label="Dirección legal" multiline rows={4} value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
