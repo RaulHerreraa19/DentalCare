@@ -4,7 +4,7 @@ import { FileText, Mail, Phone, Search, UserPlus } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from '../../lib/validators';
+import { isValidEmail, isValidPhone, normalizeEmail, normalizePhone, isValidCurp, normalizeCurp } from '../../lib/validators';
 import {
   Button,
   Card,
@@ -60,6 +60,7 @@ export default function Patients() {
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
+    curp: '',
     phone: '',
     email: '',
     date_of_birth: '',
@@ -202,6 +203,7 @@ export default function Patients() {
     setFormData({
       first_name: patient.first_name || '',
       last_name: patient.last_name || '',
+      curp: patient.curp || '',
       phone: patient.phone || '',
       email: patient.email || '',
       date_of_birth: patient.date_of_birth ? String(patient.date_of_birth).slice(0, 10) : '',
@@ -225,6 +227,13 @@ export default function Patients() {
     }
 
     try {
+      // Validate CURP if provided
+      if (formData.curp && formData.curp.trim() !== "") {
+        if (!isValidCurp(formData.curp)) {
+          Swal.fire({ icon: 'warning', title: 'CURP inválida', text: 'El CURP debe contener 18 caracteres alfanuméricos en mayúsculas.', confirmButtonColor: '#0f172a' });
+          return;
+        }
+      }
       if (editingPatient) {
         await api.put(`/patients/${editingPatient.id}`, {
           ...formData,
@@ -233,7 +242,7 @@ export default function Patients() {
         });
         await Swal.fire({ icon: 'success', title: 'Paciente Actualizado', text: 'Los datos básicos del paciente fueron actualizados correctamente.', confirmButtonColor: '#0f172a', timer: 2000 });
       } else {
-        await api.post('/patients', { ...formData, email: safeEmail, phone: normalizePhone(formData.phone) });
+        await api.post('/patients', { ...formData, email: safeEmail, phone: normalizePhone(formData.phone), curp: formData.curp ? formData.curp.trim().toUpperCase() : undefined });
         await Swal.fire({ icon: 'success', title: 'Paciente Registrado', text: 'El nuevo paciente ha sido dado de alta correctamente.', confirmButtonColor: '#0f172a', timer: 2000 });
       }
 
@@ -377,6 +386,10 @@ export default function Patients() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Input label="Teléfono (WhatsApp)" required value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
             <Input label="Email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Input label="CURP" value={formData.curp} onChange={(e) => setFormData({ ...formData, curp: e.target.value })} />
           </div>
 
           <Input label="Dirección legal" multiline rows={4} value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />

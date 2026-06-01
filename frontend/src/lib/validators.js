@@ -24,3 +24,11 @@ export const isValidPhone = (value = "") => {
   if (!raw || !PHONE_ALLOWED_CHARS_REGEX.test(raw)) return false;
   return PHONE_DIGITS_REGEX.test(raw.replace(/\D/g, ""));
 };
+
+export const isValidCurp = (value = "") => {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return false;
+  return /^[A-Z0-9]{18}$/.test(raw);
+};
+
+export const normalizeCurp = (value = "") => String(value || "").trim().toUpperCase();

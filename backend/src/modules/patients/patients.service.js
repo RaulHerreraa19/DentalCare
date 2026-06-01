@@ -5,6 +5,7 @@ const {
   assertOptionalEmail,
   assertPhone,
   assertOptionalText,
+  assertOptionalCurp,
 } = require("../../utils/validators");
 
 const VALID_GENDERS = ["M", "F", "O", "OTHER"];
@@ -166,6 +167,7 @@ class PatientsService {
         last_name: safeLastName,
         email: safeEmail,
         phone: safePhone,
+        curp: data.curp ? assertOptionalCurp(data.curp, 'El CURP') : null,
         date_of_birth: data.date_of_birth ? new Date(data.date_of_birth) : null,
         gender: safeGender,
         address: assertOptionalText(data.address, "La dirección", 250),
@@ -420,6 +422,7 @@ class PatientsService {
         last_name: safeLastName,
         email: safeEmail,
         phone: safePhone,
+        curp: data.curp !== undefined ? assertOptionalCurp(data.curp, 'El CURP') : patient.curp,
         date_of_birth:
           data.date_of_birth !== undefined
             ? data.date_of_birth

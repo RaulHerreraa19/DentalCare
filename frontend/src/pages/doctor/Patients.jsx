@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../lib/axios';
-import { isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from '../../lib/validators';
+import { isValidEmail, isValidPhone, normalizeEmail, normalizePhone, isValidCurp, normalizeCurp } from '../../lib/validators';
 import {
   Button,
   Card,
@@ -59,6 +59,7 @@ export default function DoctorPatients() {
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
+    curp: '',
     phone: '',
     email: '',
     date_of_birth: '',
@@ -94,6 +95,7 @@ export default function DoctorPatients() {
     setFormData({
       first_name: patient.first_name || '',
       last_name: patient.last_name || '',
+      curp: patient.curp || '',
       phone: patient.phone || '',
       email: patient.email || '',
       date_of_birth: patient.date_of_birth ? String(patient.date_of_birth).slice(0, 10) : '',
@@ -167,6 +169,15 @@ export default function DoctorPatients() {
         email: safeEmail,
         phone: normalizePhone(formData.phone),
       };
+
+      if (payload.curp && payload.curp.trim() !== '') {
+        if (!isValidCurp(payload.curp)) {
+          Swal.fire({ icon: 'warning', title: 'CURP inválida', text: 'El CURP debe contener 18 caracteres alfanuméricos en mayúsculas.', confirmButtonColor: '#0f172a' });
+          setSaving(false);
+          return;
+        }
+        payload.curp = normalizeCurp(payload.curp);
+      }
 
       if (editingPatient) {
         await api.put(`/patients/${editingPatient.id}`, payload);
@@ -373,6 +384,9 @@ export default function DoctorPatients() {
               <div className="grid gap-4 md:grid-cols-2">
                 <Input label="Fecha de nacimiento" type="date" required value={formData.date_of_birth} onChange={(e) => setFormData((current) => ({ ...current, date_of_birth: e.target.value }))} />
                 <SelectControl label="Género" required value={formData.gender} onChange={(e) => setFormData((current) => ({ ...current, gender: e.target.value }))} options={genderOptions} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input label="CURP" value={formData.curp} onChange={(e) => setFormData((current) => ({ ...current, curp: e.target.value }))} />
               </div>
             </div>
 

@@ -206,6 +206,7 @@ model Patient {
   last_name         String
   email             String?
   phone             String    // Usado para WhatsApp
+  curp              String?   @unique // Identificación única mexicana (NOM-024)
   date_of_birth     DateTime?
   gender            Gender?
   address           String?

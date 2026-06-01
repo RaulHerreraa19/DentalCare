@@ -21,10 +21,8 @@ const getRecord = async (req, res) => {
     const record = await MedicalRecordsService.getOrCreateRecord(
       req.user.id,
       req.params.patientId,
-      {
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
-      },
+      req.ip,
+      req.headers["user-agent"],
     );
     return ApiResponse.success(
       res,
@@ -41,6 +39,8 @@ const getHistory = async (req, res) => {
     const history = await MedicalRecordsService.getHistory(
       req.user.id,
       req.params.patientId,
+      req.ip,
+      req.headers["user-agent"],
     );
     return ApiResponse.success(
       res,

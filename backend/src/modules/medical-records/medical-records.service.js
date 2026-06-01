@@ -99,7 +99,7 @@ class MedicalRecordsService {
   /**
    * Obtiene o inicializa el expediente para un binomio específico de médico-paciente.
    */
-  static async getOrCreateRecord(doctorId, patientId) {
+  static async getOrCreateRecord(doctorId, patientId, ipAddress = null, userAgent = null) {
     const patient = await db.patient.findUnique({ where: { id: patientId } });
     if (!patient) throw new AppError("Paciente no encontrado", 404);
 
@@ -152,6 +152,23 @@ class MedicalRecordsService {
           throw error;
         }
       }
+    }
+
+    if (ipAddress || userAgent) {
+      await AuditLogService.log({
+        userId: doctorId,
+        action: "VIEW",
+        targetModel: "MEDICAL_RECORD",
+        targetId: record.id,
+        organizationId: record.organization_id,
+        patientId,
+        resourceType: "medical_record",
+        resourceId: record.id,
+        accessGranted: true,
+        ipAddress,
+        userAgent,
+        metadata: { source: "getOrCreateRecord" },
+      });
     }
 
     return attachLatestOdontogram(record);
@@ -208,11 +225,28 @@ class MedicalRecordsService {
     });
   }
 
-  static async getHistory(doctorId, patientId) {
+  static async getHistory(doctorId, patientId, ipAddress = null, userAgent = null) {
     const patient = await db.patient.findUnique({ where: { id: patientId } });
     if (!patient) throw new AppError("Paciente no encontrado", 404);
 
     const record = await this.getOrCreateRecord(doctorId, patientId);
+
+    if (ipAddress || userAgent) {
+      await AuditLogService.log({
+        userId: doctorId,
+        action: "VIEW",
+        targetModel: "MEDICAL_RECORD",
+        targetId: record.id,
+        organizationId: record.organization_id,
+        patientId,
+        resourceType: "medical_record_history",
+        resourceId: record.id,
+        accessGranted: true,
+        ipAddress,
+        userAgent,
+        metadata: { source: "getHistory" },
+      });
+    }
 
     const [versions, noteVersions, notes, odontograms, consents, auditLogs] =
       await Promise.all([
@@ -401,7 +435,7 @@ class MedicalRecordsService {
     return signedNote;
   }
 
-  static async updateRecord(doctorId, patientId, data, ipAddress) {
+  static async updateRecord(doctorId, patientId, data, ipAddress, userAgent = null) {
     const allowedFields = [
       "diagnosis",
       "treatment_plan",
@@ -418,6 +452,29 @@ class MedicalRecordsService {
       "medications",
       "status",
     ];
+
+    // Blindaje de seguridad en Alergias (NOM-004)
+    if (data.allergies !== undefined) {
+      const existingRecord = await db.medicalRecord.findUnique({
+        where: {
+          patient_id_doctor_id: {
+            patient_id: patientId,
+            doctor_id: doctorId,
+          },
+        },
+      });
+
+      if (existingRecord && existingRecord.allergies) {
+        const oldAllergies = (existingRecord.allergies || "").trim();
+        const newAllergies = (data.allergies || "").trim();
+
+        if (oldAllergies && newAllergies !== oldAllergies) {
+          if (!newAllergies.includes(oldAllergies)) {
+            data.allergies = `${oldAllergies}\n[Adición por actualización]: ${newAllergies}`;
+          }
+        }
+      }
+    }
 
     const updateData = {};
     allowedFields.forEach((field) => {
