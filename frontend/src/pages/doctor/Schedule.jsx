@@ -1,19 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Clock, ChevronRight, CheckCircle, User, FileText, LayoutDashboard, Filter } from 'lucide-react';
+import { Calendar, Clock, FileText, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/axios';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
-import { LoadingScreen } from '../../components/ui';
+import { Button, Card, DashboardSectionLayout, EmptyState, LoadingScreen, SelectControl } from '../../components/ui';
 
 export default function DoctorSchedule() {
   const [appointments, setAppointments] = useState([]);
   const [clinics, setClinics] = useState([]);
   const [selectedClinic, setSelectedClinic] = useState('');
   const [loading, setLoading] = useState(true);
-  
-  const [showAttendModal, setShowAttendModal] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
+
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -84,105 +82,104 @@ export default function DoctorSchedule() {
     }
   };
 
-  const handleAttendClick = (app) => {
-    setSelectedAppointment(app);
-    setShowAttendModal(true);
-  };
-
   if (loading && clinics.length === 0) {
     return <LoadingScreen title="Cargando agenda médica" description="Sincronizando citas del doctor" />;
   }
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto px-4 py-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-slate-200 pb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Agenda de Consultas</h1>
-          <p className="text-slate-500 mt-2 font-medium">Panel operativo de citas programadas y seguimiento clínico.</p>
-        </div>
-        
-        <div className="flex items-center space-x-3 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-          <Filter className="w-4 h-4 text-slate-400 ml-1" />
-          <select 
-            value={selectedClinic} 
+    <DashboardSectionLayout
+      eyebrow="Agenda clínica"
+      title="Agenda de consultas"
+      description="Panel operativo de citas programadas y seguimiento clínico por sucursal."
+      containerClassName="mx-auto max-w-7xl px-layout py-layout animate-in fade-in duration-500"
+      actions={(
+        <div className="w-full sm:w-72">
+          <SelectControl
+            label="Filtrar por sucursal"
+            value={selectedClinic}
             onChange={(e) => setSelectedClinic(e.target.value)}
-            className="text-[11px] font-bold text-slate-700 bg-transparent border-none focus:ring-0 outline-none cursor-pointer uppercase tracking-tight pr-8"
+            prefix={<Filter className="h-4 w-4" />}
           >
-            {clinics.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            {clinics.map((clinic) => (
+              <option key={clinic.id} value={clinic.id}>
+                {clinic.name}
+              </option>
             ))}
-          </select>
+          </SelectControl>
         </div>
-      </div>
-
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+      )}
+    >
+      <Card className="overflow-hidden">
         {appointments.length > 0 ? (
-          <div className="divide-y divide-slate-100">
-            {appointments.map((app) => (
-              <div key={app.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between hover:bg-slate-50/50 transition-colors gap-6 group">
-                <div className="flex items-center">
-                  <div className="h-12 w-12 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 font-bold mr-5 shadow-sm group-hover:bg-white transition-colors">
-                    {app.patient.first_name[0]}
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900 text-lg tracking-tight">{app.patient.first_name} {app.patient.last_name}</p>
-                    <div className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 space-x-6">
-                      <span className="flex items-center">
-                        <Calendar className="h-3 w-3 mr-2 text-slate-300" />
-                        {new Date(app.start_time).toLocaleDateString()}
-                      </span>
-                      <span className="flex items-center">
-                        <Clock className="h-3 w-3 mr-2 text-slate-300" />
-                        {new Date(app.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                      </span>
+          <div className="divide-y divide-border bg-surface">
+            {appointments.map((app) => {
+              const statusClass = app.is_paid
+                ? 'border-success-100 bg-success-50 text-success-900'
+                : app.status === 'CANCELLED'
+                  ? 'border-danger-100 bg-danger-50 text-danger-900'
+                  : app.status === 'IN_PROGRESS'
+                    ? 'border-primary-600 bg-primary-600 text-white'
+                    : 'border-border bg-surface-muted text-muted';
+
+              return (
+                <div key={app.id} className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface-muted text-sm font-semibold text-ink">
+                      {app.patient.first_name[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">{app.patient.first_name} {app.patient.last_name}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-caption text-muted">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5" />
+                          {new Date(app.start_time).toLocaleDateString()}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          {new Date(app.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-3">
-                  <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest border transition-colors ${
-                    app.is_paid 
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100 italic' 
-                      : (app.status === 'CANCELLED' 
-                          ? 'bg-rose-50 text-rose-700 border-rose-100' 
-                          : (app.status === 'IN_PROGRESS' 
-                              ? 'bg-slate-900 text-white border-slate-900'
-                              : 'bg-slate-100 text-slate-500 border-slate-200'))
-                  }`}>
-                    {app.status === 'IN_PROGRESS' ? 'Consulta Finalizada' : app.status}
-                  </span>
-                  
-                  <div className="h-4 w-px bg-slate-200 mx-1 hidden md:block"></div>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <span className={`inline-flex items-center rounded-control border px-3 py-1 text-caption uppercase tracking-[0.14em] ${statusClass}`}>
+                      {app.status === 'IN_PROGRESS' ? 'Consulta finalizada' : app.status}
+                    </span>
 
-                  <button 
-                    onClick={() => navigate(`/doctor/medical-records/${app.patient.id}`)}
-                    className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded transition-all flex items-center h-10 px-4"
-                    title="Ver Expediente"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Expediente</span>
-                  </button>
-
-                  {(!app.is_paid && app.status !== 'CANCELLED' && app.status !== 'COMPLETED' && app.status !== 'IN_PROGRESS') && (
-                    <button 
-                      onClick={() => navigate(`/doctor/medical-records/${app.patient.id}?appointmentId=${app.id}`)}
-                      className="h-10 px-6 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded hover:bg-black transition-all shadow-lg shadow-slate-200"
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => navigate(`/doctor/medical-records/${app.patient.id}`)}
+                      title="Ver expediente"
                     >
-                      Iniciar Consulta
-                    </button>
-                  )}
+                      <FileText className="h-4 w-4" />
+                      Expediente
+                    </Button>
+
+                    {(!app.is_paid && app.status !== 'CANCELLED' && app.status !== 'COMPLETED' && app.status !== 'IN_PROGRESS') ? (
+                      <Button
+                        size="sm"
+                        onClick={() => navigate(`/doctor/medical-records/${app.patient.id}?appointmentId=${app.id}`)}
+                      >
+                        Iniciar consulta
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          <div className="p-20 text-center flex flex-col items-center opacity-40">
-            <Calendar className="h-12 w-12 text-slate-300 mb-4" />
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sin compromisos programados</h3>
-          </div>
+          <EmptyState
+            icon={Calendar}
+            title="Sin compromisos programados"
+            description="No hay citas registradas para la sucursal y rango de fechas actual."
+            className="m-6"
+          />
         )}
-      </div>
-    </div>
+      </Card>
+    </DashboardSectionLayout>
   );
 }
 

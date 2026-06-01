@@ -3,7 +3,7 @@ import { Calendar, Users, Activity, Clock, ChevronRight, FileText } from 'lucide
 import api from '../../lib/axios';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LoadingScreen } from '../../components/ui';
+import { Button, Card, DashboardSectionLayout, KPIStatCard, LoadingScreen } from '../../components/ui';
 
 export default function DoctorDashboard() {
   const [stats, setStats] = useState({
@@ -78,104 +78,102 @@ export default function DoctorDashboard() {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Bienvenido de nuevo, Dr.</h1>
-        <p className="text-gray-500">Aquí tienes un resumen de tu jornada para hoy.</p>
+    <DashboardSectionLayout
+      eyebrow="Atención clínica"
+      title="Panel del doctor"
+      description="Resumen operativo del día con acceso rápido a agenda, pacientes y expedientes."
+      containerClassName="mx-auto max-w-7xl px-layout py-layout animate-in fade-in duration-500"
+    >
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <KPIStatCard
+          title="Citas hoy"
+          value={stats.todayAppointments}
+          tone="primary"
+          badge="Agenda"
+          icon={Calendar}
+          footer="Consultas del día"
+        />
+        <KPIStatCard
+          title="Pacientes totales"
+          value={stats.totalPatients ?? '—'}
+          tone="accent"
+          badge="Directorio"
+          icon={Users}
+          footer={patientsError ? patientsError : 'Pacientes vinculados'}
+          footerClassName={patientsError ? 'text-danger-600' : undefined}
+        />
+        <KPIStatCard
+          title="Estado"
+          value="Activo"
+          tone="success"
+          badge="En línea"
+          icon={Activity}
+          footer="Operación clínica"
+        />
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center">
-          <div className="p-3 bg-primary-50 rounded-xl mr-4">
-            <Calendar className="h-6 w-6 text-primary-600" />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border bg-surface-muted px-6 py-5">
+            <div className="space-y-1">
+              <p className="text-label text-muted">Agenda inmediata</p>
+              <h2 className="text-section-title text-ink">Próximas citas</h2>
+            </div>
+            <Button as={Link} to="/doctor/schedule" size="sm" variant="secondary">
+              Ver todas
+            </Button>
           </div>
-          <div>
-            <p className="text-sm text-gray-500 font-medium">Citas Hoy</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.todayAppointments}</p>
-          </div>
-        </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center">
-          <div className="p-3 bg-blue-50 rounded-xl mr-4">
-            <Users className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 font-medium">Pacientes Totales</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalPatients ?? '—'}</p>
-            {patientsError ? <p className="text-xs text-red-600 mt-1">{patientsError}</p> : null}
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center">
-          <div className="p-3 bg-purple-50 rounded-xl mr-4">
-            <Activity className="h-6 w-6 text-purple-600" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 font-medium">Estado</p>
-            <p className="text-2xl font-bold text-green-600">Activo</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Upcoming Appointments */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="font-bold text-gray-900">Próximas Citas</h2>
-            <Link to="/doctor/schedule" className="text-sm text-primary-600 font-medium hover:underline">Ver todas</Link>
-          </div>
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-border bg-surface">
             {upcomingAppointments.length > 0 ? (
               upcomingAppointments.map((app) => (
-                <div key={app.id} className="p-6 flex items-center hover:bg-gray-50 transition-colors">
-                  <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-bold mr-4">
+                <div key={app.id} className="flex items-center gap-4 px-6 py-5 transition-colors hover:bg-surface-muted/50">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface-muted text-sm font-semibold text-ink">
                     {app.patient.first_name[0]}
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{app.patient.first_name} {app.patient.last_name}</p>
-                    <div className="flex items-center text-sm text-gray-500 mt-1">
-                      <Clock className="h-3 w-3 mr-1" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink">{app.patient.first_name} {app.patient.last_name}</p>
+                    <p className="mt-1 flex items-center gap-1 text-caption text-muted">
+                      <Clock className="h-3.5 w-3.5" />
                       {new Date(app.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </div>
+                    </p>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-gray-300" />
+                  <ChevronRight className="h-4 w-4 text-muted" />
                 </div>
               ))
             ) : (
-              <div className="p-12 text-center">
-                <p className="text-gray-400">No tienes más citas programadas para hoy.</p>
-              </div>
+              <div className="px-6 py-12 text-center text-body text-muted">No tienes más citas programadas para hoy.</div>
             )}
           </div>
-        </div>
+        </Card>
 
-        {/* Quick Actions / Shortcuts */}
-        <div className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg p-8 text-white flex flex-col justify-between">
-          <div>
-            <h2 className="text-xl font-bold mb-2">Acceso Rápido</h2>
-            <p className="text-primary-100 mb-6">Gestiona tus servicios y agenda en un clic.</p>
+        <Card className="p-6">
+          <div className="space-y-1">
+            <p className="text-label text-muted">Acceso directo</p>
+            <h2 className="text-section-title text-ink">Atajos clínicos</h2>
+            <p className="text-body text-muted">Ingresa rápidamente a los flujos más usados durante consulta.</p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Link to="/doctor/patients" className="bg-white/10 hover:bg-white/20 p-4 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
-              <Users className="h-6 w-6 mb-2" />
-              <p className="font-medium">Pacientes</p>
-            </Link>
-            <Link to="/doctor/records" className="bg-white/10 hover:bg-white/20 p-4 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
-              <FileText className="h-6 w-6 mb-2" />
-              <p className="font-medium">Expedientes</p>
-            </Link>
-            <Link to="/doctor/schedule" className="bg-white/10 hover:bg-white/20 p-4 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
-              <Calendar className="h-6 w-6 mb-2" />
-              <p className="font-medium">Abrir Agenda</p>
-            </Link>
-            <Link to="/doctor/services" className="bg-white/10 hover:bg-white/20 p-4 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
-              <Activity className="h-6 w-6 mb-2" />
-              <p className="font-medium">Servicios</p>
-            </Link>
+
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Button as={Link} to="/doctor/patients" variant="secondary" className="justify-start">
+              <Users className="h-4 w-4" />
+              Pacientes
+            </Button>
+            <Button as={Link} to="/doctor/records" variant="secondary" className="justify-start">
+              <FileText className="h-4 w-4" />
+              Expedientes
+            </Button>
+            <Button as={Link} to="/doctor/schedule" variant="secondary" className="justify-start">
+              <Calendar className="h-4 w-4" />
+              Abrir agenda
+            </Button>
+            <Button as={Link} to="/doctor/services" variant="secondary" className="justify-start">
+              <Activity className="h-4 w-4" />
+              Servicios
+            </Button>
           </div>
-        </div>
+        </Card>
       </div>
-    </div>
+    </DashboardSectionLayout>
   );
 }

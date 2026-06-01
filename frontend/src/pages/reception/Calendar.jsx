@@ -4,10 +4,10 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import api from '../../lib/axios';
-import { Calendar as CalendarIcon, Filter, MapPin, User, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Filter, MapPin, User, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
-import { LoadingScreen } from '../../components/ui';
+import { Card, DashboardSectionLayout, LoadingScreen, SelectControl } from '../../components/ui';
 
 export default function Calendar() {
   const [appointments, setAppointments] = useState([]);
@@ -121,28 +121,27 @@ export default function Calendar() {
 
   return (
     clinicsLoading || appointmentsLoading ? <LoadingScreen title="Cargando calendario operativo" description="Sincronizando clínicas y citas" /> : (
-    <div className="p-8 h-screen flex flex-col bg-slate-50 space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Agenda Operativa</h1>
-           <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Gestión centralizada de citas y servicios</p>
-        </div>
-        
-        <div className="flex items-center space-x-3 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-          <Filter className="w-4 h-4 text-slate-400 ml-1" />
-          <select 
-            value={selectedClinic} 
+    <DashboardSectionLayout
+      eyebrow="Operación recepción"
+      title="Agenda operativa"
+      description="Gestión centralizada de citas, cobros y estado de atención por sucursal."
+      containerClassName="mx-auto max-w-7xl px-layout py-layout animate-in fade-in duration-500"
+      actions={(
+        <div className="w-full sm:w-72">
+          <SelectControl
+            label="Filtrar por sucursal"
+            value={selectedClinic}
             onChange={(e) => setSelectedClinic(e.target.value)}
-            className="text-xs font-bold text-slate-700 bg-transparent border-none focus:ring-0 outline-none cursor-pointer uppercase tracking-tight pr-8"
+            prefix={<Filter className="h-4 w-4" />}
           >
-            {clinics.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            {clinics.map((clinic) => (
+              <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
             ))}
-          </select>
+          </SelectControl>
         </div>
-      </div>
-
-      <div className="flex-grow bg-white p-6 rounded-lg border border-slate-200 shadow-sm overflow-hidden formal-calendar">
+      )}
+    >
+      <Card className="h-[72vh] overflow-hidden p-4 md:p-6 formal-calendar">
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
@@ -175,7 +174,7 @@ export default function Calendar() {
             hour12: false
           }}
         />
-      </div>
+      </Card>
 
       {showCreateModal && (
         <CreateAppointmentModal 
@@ -199,7 +198,7 @@ export default function Calendar() {
           }}
         />
       )}
-    </div>
+    </DashboardSectionLayout>
     )
   );
 }

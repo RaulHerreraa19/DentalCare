@@ -3,14 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   CalendarDays,
-  Clock,
   FileText,
   PencilLine,
   Plus,
   Search,
-  ShieldCheck,
   Stethoscope,
-  UserCircle2,
   Users,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -75,6 +72,7 @@ export default function DoctorPatients() {
     setFormData({
       first_name: '',
       last_name: '',
+      curp: '',
       phone: '',
       email: '',
       date_of_birth: '',
@@ -298,7 +296,7 @@ export default function DoctorPatients() {
                   </td>
                   <td className="px-6 py-5 align-top">
                     <div className="space-y-2 text-sm">
-                      <div className="inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]">
+                      <div className={`inline-flex items-center rounded-control border px-3 py-1 text-caption uppercase tracking-[0.14em] ${patient.has_record ? 'border-success-100 bg-success-50 text-success-900' : 'border-warning-100 bg-warning-50 text-warning-900'}`}>
                         {patient.has_record ? 'Con expediente' : 'Pendiente'}
                       </div>
                       <p className="text-caption text-muted">{patient.record_status ? `Expediente ${patient.record_status.toLowerCase()}` : 'Se generará al abrir el expediente'}</p>
@@ -372,7 +370,7 @@ export default function DoctorPatients() {
       >
         <form id="doctor-patient-form" onSubmit={handleSavePatient} className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-border bg-surface-muted/60 p-4 space-y-4">
+            <div className="rounded-panel border border-border bg-surface-muted/60 p-4 space-y-4">
               <div>
                 <p className="text-label text-muted">Identidad</p>
                 <h3 className="text-base font-semibold text-ink">Datos básicos</h3>
@@ -390,7 +388,7 @@ export default function DoctorPatients() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-surface-muted/60 p-4 space-y-4">
+            <div className="rounded-panel border border-border bg-surface-muted/60 p-4 space-y-4">
               <div>
                 <p className="text-label text-muted">Contacto</p>
                 <h3 className="text-base font-semibold text-ink">Medios de comunicación</h3>
@@ -403,7 +401,7 @@ export default function DoctorPatients() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-border bg-surface-muted/60 p-4 space-y-4">
+          <div className="rounded-panel border border-border bg-surface-muted/60 p-4 space-y-4">
             <div>
               <p className="text-label text-muted">Contexto clínico</p>
               <h3 className="text-base font-semibold text-ink">Información adicional</h3>

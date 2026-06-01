@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../../lib/axios';
 import { Plus, Settings, Trash2, ListChecks, DollarSign } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { LoadingScreen } from '../../components/ui';
+import { Button, Card, DashboardSectionLayout, DataTable, EmptyState, Input, LoadingScreen } from '../../components/ui';
 
 export default function DoctorServices() {
   const [services, setServices] = useState([]);
@@ -87,104 +87,100 @@ export default function DoctorServices() {
   if (loading && services.length === 0) return <LoadingScreen title="Cargando catálogo profesional" description="Sincronizando servicios activos" />;
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto px-4 py-12 animate-in fade-in duration-500">
-      <div className="border-b border-slate-200 pb-8">
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight text-uppercase">Portafolio de Servicios</h1>
-        <p className="text-slate-500 mt-2 font-medium">Gestión de tratamientos, honorarios y oferta médica personalizada.</p>
-      </div>
-
-      <div className="bg-slate-50 p-8 rounded-lg border border-slate-200 shadow-sm">
-        <div className="flex items-center space-x-2 mb-6">
-          <Plus className="w-4 h-4 text-slate-900" />
-          <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Registrar Nuevo Concepto</h2>
+    <DashboardSectionLayout
+      eyebrow="Catálogo clínico"
+      title="Servicios profesionales"
+      description="Define y administra conceptos de facturación para consultas y procedimientos."
+      containerClassName="mx-auto max-w-6xl px-layout py-layout animate-in fade-in duration-500"
+    >
+      <Card className="p-6 md:p-8">
+        <div className="mb-6 flex items-center gap-2">
+          <Plus className="h-4 w-4 text-primary-600" />
+          <p className="text-label text-muted">Registrar nuevo concepto</p>
         </div>
-        
-        <form onSubmit={handleCreate} className="flex flex-col md:flex-row gap-6 items-end">
-          <div className="flex-1 w-full space-y-1">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Descripción del Servicio</label>
-            <input 
-              required 
-              placeholder="Ej. Diagnóstico Clínico General"
-              className="w-full border border-slate-200 p-3 rounded-lg text-sm focus:ring-1 focus:ring-slate-900 outline-none bg-white font-semibold text-slate-700" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
-            />
-          </div>
-          <div className="w-full md:w-56 space-y-1">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Honorario Bruto ($)</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-slate-400 font-bold">$</span>
-              </div>
-              <input 
-                required 
-                type="number" 
-                step="0.01" 
-                placeholder="0.00"
-                className="w-full border border-slate-200 p-3 pl-8 rounded-lg text-sm font-bold focus:ring-1 focus:ring-slate-900 outline-none bg-white" 
-                value={price} 
-                onChange={e => setPrice(e.target.value)} 
-              />
-            </div>
-          </div>
-          <button type="submit" className="bg-slate-900 text-white px-8 py-3 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 w-full md:w-auto">
-            Añadir al Catálogo
-          </button>
+
+        <form onSubmit={handleCreate} className="grid gap-4 md:grid-cols-[1fr_220px_auto] md:items-end">
+          <Input
+            required
+            label="Descripción del servicio"
+            placeholder="Ej. Diagnóstico clínico general"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Input
+            required
+            label="Honorario bruto"
+            type="number"
+            step="0.01"
+            placeholder="0.00"
+            prefix={<span className="text-muted">$</span>}
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+          />
+          <Button type="submit" className="w-full md:w-auto">
+            Añadir al catálogo
+          </Button>
         </form>
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-           <div className="flex items-center space-x-2">
-             <ListChecks className="w-4 h-4 text-slate-500" />
-             <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Activos en el Catálogo</h3>
-           </div>
-           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{services.length} Conceptos Registrados</span>
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border bg-surface-muted px-6 py-4">
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-4 w-4 text-muted" />
+            <p className="text-label text-muted">Servicios activos</p>
+          </div>
+          <span className="text-caption uppercase tracking-[0.14em] text-muted">{services.length} registros</span>
         </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100">
-                <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Detalle del Servicio</th>
-                <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Honorario</th>
-                <th className="px-8 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Operaciones</th>
+
+        <DataTable
+          isEmpty={services.length === 0}
+          emptyState={(
+            <EmptyState
+              icon={Settings}
+              title="No hay servicios registrados"
+              description="Agrega el primer concepto para comenzar a facturar desde consulta."
+            />
+          )}
+        >
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-surface">
+              <tr>
+                <th className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Detalle del servicio</th>
+                <th className="px-6 py-3 text-left text-caption uppercase tracking-[0.14em] text-muted">Honorario</th>
+                <th className="px-6 py-3 text-right text-caption uppercase tracking-[0.14em] text-muted">Operaciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 italic font-medium">
-              {services.map(service => (
-                <tr key={service.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-8 py-5">
-                    <div className="text-sm font-bold text-slate-900 group-hover:text-slate-950 uppercase tracking-tight">{service.name}</div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">ID: {service.id.substring(0,8).toUpperCase()}</div>
+            <tbody className="divide-y divide-border bg-surface">
+              {services.map((service) => (
+                <tr key={service.id} className="transition-colors hover:bg-surface-muted/50">
+                  <td className="px-6 py-4 align-top">
+                    <p className="text-sm font-semibold text-ink">{service.name}</p>
+                    <p className="mt-0.5 text-caption text-muted">ID: {service.id.substring(0, 8).toUpperCase()}</p>
                   </td>
-                  <td className="px-8 py-5">
-                    <div className="flex items-center text-sm font-black text-slate-900">
-                      <DollarSign className="w-3 h-3 mr-1 text-slate-400" />
+                  <td className="px-6 py-4 align-top">
+                    <div className="flex items-center text-sm font-semibold text-ink">
+                      <DollarSign className="mr-1 h-3.5 w-3.5 text-muted" />
                       {parseFloat(service.price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </div>
                   </td>
-                  <td className="px-8 py-5 text-right">
-                    <button 
-                      onClick={() => handleDelete(service.id)} 
-                      className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition-all"
+                  <td className="px-6 py-4 text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(service.id)}
                       title="Eliminar del catálogo"
+                      className="text-danger-600 hover:bg-danger-50 hover:text-danger-900"
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      <Trash2 className="h-4 w-4" />
+                      Eliminar
+                    </Button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-        {services.length === 0 && (
-          <div className="p-20 text-center opacity-40">
-            <Settings className="mx-auto h-12 w-12 mb-4 text-slate-200 animate-spin-slow" />
-            <p className="font-bold uppercase tracking-widest text-[11px] text-slate-400 italic">No se han definido conceptos de facturación</p>
-          </div>
-        )}
-      </div>
-    </div>
+        </DataTable>
+      </Card>
+    </DashboardSectionLayout>
   );
 }

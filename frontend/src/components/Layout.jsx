@@ -53,15 +53,17 @@ export const Layout = () => {
   const getMenuOptions = () => menuOptions[user?.role] || [];
 
   return (
-    <div className="flex h-screen bg-[#f7fafc] font-sans antialiased text-ink">
-      {/* Sidebar Corporativo */}
-      <aside className="w-72 bg-white flex flex-col shadow-[0_24px_60px_-24px_rgba(15,23,42,0.22)] z-20 border-r border-slate-200/80">
-        <div className="h-20 flex items-center px-8 border-b border-slate-200">
-          <Activity className="h-6 w-6 text-slate-700 mr-3" />
-          <span className="text-lg tracking-tight text-slate-900 uppercase font-medium">DentalCare <span className="text-[10px] text-slate-500 block -mt-1 font-normal tracking-[0.22em]">Enterprise</span></span>
+    <div className="flex h-screen bg-canvas text-ink antialiased">
+      <aside className="z-20 flex w-72 flex-col border-r border-border bg-surface shadow-panel">
+        <div className="flex h-20 items-center border-b border-border px-8">
+          <Activity className="mr-3 h-5 w-5 text-primary-600" />
+          <span className="text-base font-semibold tracking-tight text-ink">
+            DentalCare
+            <span className="mt-0.5 block text-caption font-medium uppercase tracking-[0.16em] text-muted">Enterprise</span>
+          </span>
         </div>
-        
-        <nav className="flex-1 px-4 py-8 space-y-1">
+
+        <nav className="flex-1 space-y-1 px-4 py-8">
           {getMenuOptions().map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.includes(item.path);
@@ -69,53 +71,52 @@ export const Layout = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center px-4 py-3 rounded-xl transition-all group ${
-                  isActive 
-                    ? 'bg-slate-100 text-slate-900 shadow-sm' 
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                className={`group flex items-center rounded-control px-4 py-3 text-sm transition-colors ${
+                  isActive
+                    ? 'bg-surface-muted text-ink'
+                    : 'text-muted hover:bg-surface-muted hover:text-ink'
                 }`}
               >
-                <Icon className={`h-4 w-4 mr-3 transition-colors ${isActive ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-700'}`} />
-                <span className={`text-[13px] font-normal tracking-wide ${isActive ? 'opacity-100' : 'opacity-90'}`}>{item.name}</span>
+                <Icon className={`mr-3 h-4 w-4 transition-colors ${isActive ? 'text-primary-600' : 'text-muted group-hover:text-ink'}`} />
+                <span className="text-body leading-none">{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-6 bg-slate-50 border-t border-slate-200">
-          <div className="flex items-center px-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-700 font-semibold mr-3 shadow-sm">
+        <div className="border-t border-border bg-surface-muted p-6">
+          <div className="mb-5 flex items-center px-1">
+            <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-control border border-border bg-surface text-sm font-semibold text-ink">
               {user?.first_name?.[0]}
             </div>
             <div className="truncate">
-              <p className="text-sm font-medium text-slate-900 truncate">{user?.first_name} {user?.last_name}</p>
-              <p className="text-[10px] text-slate-500 uppercase font-normal tracking-[0.22em] mt-0.5">{user?.role?.replace('_', ' ')}</p>
+              <p className="truncate text-sm font-medium text-ink">{user?.first_name} {user?.last_name}</p>
+              <p className="mt-0.5 text-caption uppercase tracking-[0.14em] text-muted">{user?.role?.replace('_', ' ')}</p>
             </div>
           </div>
-          <button 
+
+          <button
             onClick={handleLogout}
-            className="w-full flex items-center px-4 py-2.5 text-[11px] font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-all border border-slate-200 uppercase tracking-[0.2em]"
+            className="flex w-full items-center rounded-control border border-border px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-danger-600 transition-colors hover:bg-danger-50 hover:text-danger-900"
           >
-            <LogOut className="h-3.5 w-3.5 mr-3" />
+            <LogOut className="mr-3 h-3.5 w-3.5" />
             Cerrar Sesión Activa
           </button>
         </div>
       </aside>
 
-      {/* Area de Trabajo */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Top bar sutil */}
-          <header className="h-14 bg-surface border-b border-border flex items-center px-layout justify-between z-10 shadow-soft">
-            <div className="text-caption text-muted font-bold uppercase tracking-[0.2em]">
-             Sincronización segura de datos operativos
-           </div>
-            <div className="flex items-center space-x-1 text-caption font-bold text-muted uppercase">
+        <header className="z-10 flex h-14 items-center justify-between border-b border-border bg-surface px-layout shadow-soft">
+          <div className="text-caption font-semibold uppercase tracking-[0.14em] text-muted">
+            Sincronización segura de datos operativos
+          </div>
+          <div className="flex items-center gap-1 text-caption font-semibold uppercase text-muted">
               <FileText className="w-3 h-3" />
               <span>Version 2.4.0</span>
-           </div>
+          </div>
         </header>
 
-          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-canvas relative">
+        <main className="relative flex-1 overflow-x-hidden overflow-y-auto bg-canvas">
           <div className="absolute inset-0 bg-grid-slate-200/[0.05] [mask-image:linear-gradient(to_bottom,white,transparent)] pointer-events-none" />
           <div className="relative z-10">
             <Outlet />
